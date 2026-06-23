@@ -44,28 +44,9 @@ class ShinsaType(Enum):
     LOCAL = 1
     UNION = 2
     CENTRAL = 3
-class CandidateType(Enum):
-    GENERAL = 1
-    STUDENT = 2
-    UNIVERSITY = 3
-    FACULTY = 4
 class DeliveryMethodType(Enum):
     FACING = 1
     VIDEO = 2
-
-class CandidateParser:
-    @staticmethod
-    def get_type(shinsa_name: str, note: str) -> CandidateType:
-        name_upper = shinsa_name.upper()
-        note_upper = note.upper()
-        
-        if '高校' in name_upper or any(k in note_upper for k in ['高校生', '中学生', '小学生', '少年部', '中高生']):
-            if any(k in note_upper for k in ['一般', '初段以上', '弐段以上', '参段以上']):
-                return CandidateType.GENERAL
-            return CandidateType.STUDENT
-        elif any(k in name_upper for k in ['大学', '学連', '學生連盟']):
-            return CandidateType.UNIVERSITY
-        return CandidateType.GENERAL
 
 class DeliveryMethodParser:
     @staticmethod
@@ -91,7 +72,6 @@ class ShinsaEntity:
     def __init__(
             self,
             data: ShinsaData,
-            candidate_parser: CandidateParser,
             delivery_method_parser: DeliveryMethodParser
         ):
         self._year = data.get('year', 0)
@@ -109,9 +89,6 @@ class ShinsaEntity:
             self._day
         )
 
-        self.candidate_type = candidate_parser.get_type(
-            self.name, self.note
-        ).value
         self.delivery_method_type = delivery_method_parser.get_type(
             self.name, self.note
         ).value

@@ -2,13 +2,11 @@ import io
 import scrapy
 import pandas as pd
 import pdfplumber
-import json
 
 from shinsa_tori.items import ShinsaItem
 from shinsa_tori.utils import (
     ShinsaData,
     ShinsaEntity,
-    CandidateParser,
     DeliveryMethodParser,
     RankParser,
     normalize_df
@@ -111,7 +109,6 @@ class AichiSpider(scrapy.Spider):
 
                 shinsa = ShinsaEntity(
                     data = shinsa_data,
-                    candidate_parser = CandidateParser,
                     delivery_method_parser = DeliveryMethodParser
                 )
 
@@ -123,7 +120,6 @@ class AichiSpider(scrapy.Spider):
                     'type': shinsa.type,
                     'location': shinsa.location,
                     'start_at': shinsa.start_at,
-                    'candidate_type': shinsa.candidate_type,
                     'delivery_method_type': shinsa.delivery_method_type,
                     'note': shinsa.note,
 
