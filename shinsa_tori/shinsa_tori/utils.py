@@ -1,6 +1,5 @@
 import unicodedata
 import pandas as pd
-import uuid
 
 from datetime import datetime
 from dataclasses import dataclass
@@ -99,7 +98,6 @@ class ShinsaEntity:
         self._month = data.get('month', 0)
         self._day = data.get('day', 0)
 
-        self.id = str(uuid.uuid4())
         self.name = str(data.get('name', '')).strip()
         self.location = str(data.get('location', '')).strip()
         self.note = str(data.get('note', '')).strip()
@@ -134,29 +132,19 @@ class ShinsaEntity:
       return datetime(year, month, day).strftime(START_AT_PGSQL_FORMAT)
 
 class RankParser:
-    def __init__(
-            self,
-            shinsa_id: str
-        ):
+    def __init__(self):
         self.target_value = '〇'
 
-        self.shinsa_id = shinsa_id
-
     def parse_row(self, row: dict) -> list:
-        filtered_names = []
+        accepted_names = []
         
-        for dan in RANK_NAMES:
-            col = next((k for k in row.keys() if str(k) in dan), None)
+        for name in RANK_NAMES:
+            col = next((k for k in row.keys() if str(k) in name), None)
 
             if col:
                 cell_value = str(row.get(col, '')).strip()
 
                 if cell_value == self.target_value:
-                    filtered_names.append(dan)
-                    
-        return [
-            {
-                'shinsa_id': self.shinsa_id, 
-                'rank_name': name
-            } for name in filtered_names
-        ]
+                    accepted_names.append(name)
+
+        return accepted_names

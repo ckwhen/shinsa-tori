@@ -40,12 +40,12 @@ class ShinsaToriPipeline:
                 if item.get('ranks'):
                     insert_rank_shinsa_sql = """
                         INSERT INTO ranks_shinsas (shinsa_id, rank_id)
-                        SELECT %s, id FROM ranks WHERE name LIKE %s LIMIT 1;
+                        SELECT %s, id FROM ranks WHERE name = %s;
                     """
 
                     rank_shinsa_batch = [
-                        (actual_shinsa_id, f"{r['rank_name'].strip()}%")
-                        for r in item['ranks']
+                        (actual_shinsa_id, rank_name)
+                        for rank_name in item['ranks']
                     ]
                     cur.executemany(insert_rank_shinsa_sql, rank_shinsa_batch)
 

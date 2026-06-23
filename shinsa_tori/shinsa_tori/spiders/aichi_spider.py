@@ -65,8 +65,6 @@ class AichiSpider(scrapy.Spider):
             for shinsa in shinsa_dicts:
                 yield ShinsaItem(**shinsa)
 
-            with open("rank_items.json", "w", encoding="utf-8") as f:
-                json.dump(rank_items, f, ensure_ascii=False, indent=4)
         else:
             print('沒有找到任何表格')
 
@@ -117,11 +115,10 @@ class AichiSpider(scrapy.Spider):
                     delivery_method_parser = DeliveryMethodParser
                 )
 
-                rankParser = RankParser(shinsa.id)
+                rankParser = RankParser()
                 rank_dicts.extend(rankParser.parse_row(row))
 
                 shinsa_dict = {
-                    'id': shinsa.id,
                     'name': shinsa.name,
                     'type': shinsa.type,
                     'location': shinsa.location,
