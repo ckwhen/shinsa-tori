@@ -4,13 +4,12 @@ import pandas as pd
 import pdfplumber
 import json
 
-from shinsa_tori.items import ShinsaItem, DanItem
+from shinsa_tori.items import ShinsaItem
 from shinsa_tori.utils import (
     ShinsaData,
     ShinsaEntity,
     CandidateParser,
     DeliveryMethodParser,
-    RANK_NAMES,
     RankParser,
     normalize_df
 )
@@ -61,7 +60,10 @@ class AichiSpider(scrapy.Spider):
             # 去除各頁表頭
             flattened_df = pd.concat(all_dfs, ignore_index = True)
 
-            shinsa_items, rank_items = self.convert_df_to_items(flattened_df)
+            shinsa_dicts = self.convert_df_to_items(flattened_df)
+
+            for shinsa in shinsa_dicts:
+                yield ShinsaItem(**shinsa)
 
             with open("rank_items.json", "w", encoding="utf-8") as f:
                 json.dump(rank_items, f, ensure_ascii=False, indent=4)
@@ -69,9 +71,8 @@ class AichiSpider(scrapy.Spider):
             print('沒有找到任何表格')
 
     @staticmethod
-    def convert_df_to_items(df: pd.DataFrame) -> tuple[list, list]:
-        shinsa_items = []
-        rank_items = []
+    def convert_df_to_items(df: pd.DataFrame) -> list:
+        shinsa_dicts = []
 
         # 正規化日文字串
         target_df = normalize_df(
@@ -99,6 +100,8 @@ class AichiSpider(scrapy.Spider):
                     days_list.append(int(raw_day))
 
             for day in days_list:
+                rank_dicts = []
+
                 shinsa_data = ShinsaData(
                     name = str(row.get('審査名', '')).strip(),
                     location = str(row.get('会場名', '')).strip(),
@@ -115,19 +118,21 @@ class AichiSpider(scrapy.Spider):
                 )
 
                 rankParser = RankParser(shinsa.id)
-                rank_items.extend(rankParser.parse_row(row))
+                rank_dicts.extend(rankParser.parse_row(row))
 
-                shinsa_item = {
-                  'id': shinsa.id,
-                  'name': shinsa.name,
-                  'type': shinsa.type,
-                  'location': shinsa.location,
-                  'start_at': shinsa.start_at,
-                  'candidate_type': shinsa.candidate_type,
-                  'delivery_method_type': shinsa.delivery_method_type,
-                  'note': shinsa.note,
+                shinsa_dict = {
+                    'id': shinsa.id,
+                    'name': shinsa.name,
+                    'type': shinsa.type,
+                    'location': shinsa.location,
+                    'start_at': shinsa.start_at,
+                    'candidate_type': shinsa.candidate_type,
+                    'delivery_method_type': shinsa.delivery_method_type,
+                    'note': shinsa.note,
+
+                    'ranks': rank_dicts
                 }
 
-                shinsa_items.append(shinsa_item)
+                shinsa_dicts.append(shinsa_dict)
 
-        return shinsa_items, rank_items
+        return shinsa_dicts
