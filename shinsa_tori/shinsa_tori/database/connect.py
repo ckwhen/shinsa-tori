@@ -12,19 +12,6 @@ dotenv_path = os.path.join(ROOT_DIR, 'configs', '.env')
 load_dotenv(dotenv_path)
 
 def get_db_pool():
-    db_host = os.getenv("DB_HOST")
-    db_port = os.getenv("DB_PORT")
-    db_user = os.getenv("DB_USER")
-    db_name = os.getenv("DB_NAME")
-
-    print("\n" + "="*50)
-    print("🔍 [DEBUG] 正在檢查環境變數載入狀態：")
-    print(f"  - ROOT_DIR: {ROOT_DIR}")
-    print(f"  - DB_HOST: {db_host} (型態: {type(db_host)})")
-    print(f"  - DB_PORT: {db_port} (型態: {type(db_port)})")
-    print(f"  - DB_USER: {db_user}")
-    print(f"  - DB_NAME: {db_name}")
-
     return pool.SimpleConnectionPool(
         minconn=1,
         maxconn=10,
