@@ -71,7 +71,11 @@ class AichiSpider(scrapy.Spider):
         if all_dfs:
             # 去除各頁表頭
             flattened_df = pd.concat(all_dfs, ignore_index = True)
+
             flattened_df['year'] = curr_year
+
+            # 過濾非地連審查
+            flattened_df = flattened_df[flattened_df['審査区分'].str.contains('地方', na=False)]
 
             shinsa_dicts = self.convert_df_to_items(flattened_df)
 
