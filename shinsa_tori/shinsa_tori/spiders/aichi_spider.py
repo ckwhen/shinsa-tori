@@ -5,6 +5,9 @@ import pdfplumber
 
 from shinsa_tori.items import ShinsaItem
 from shinsa_tori.utils import (
+    CURRENT_YEAR,
+    get_era_year_by_text,
+    convert_reiwa_to_ce_year,
     ShinsaData,
     ShinsaEntity,
     DeliveryMethodParser,
@@ -37,9 +40,20 @@ class AichiSpider(scrapy.Spider):
         self.logger.info("開始解構 PDF 表格數據...")
         pdf_file = io.BytesIO(response.body)
 
+        curr_year = CURRENT_YEAR
         all_dfs = []
 
         with pdfplumber.open(pdf_file) as pdf:
+            if pdf.pages:
+                first_page_text = pdf.pages[0].extract_text() or ''
+                era_year = get_era_year_by_text(first_page_text)
+
+                if era_year is None:
+                    print("因找不到年度，取消此 PDF 的後續解析流程。")
+                    return
+
+                curr_year = convert_reiwa_to_ce_year(era_year)
+
             for page in pdf.pages:
                 table = page.extract_table()
                 if not table:
@@ -57,6 +71,7 @@ class AichiSpider(scrapy.Spider):
         if all_dfs:
             # 去除各頁表頭
             flattened_df = pd.concat(all_dfs, ignore_index = True)
+            flattened_df['year'] = curr_year
 
             shinsa_dicts = self.convert_df_to_items(flattened_df)
 
@@ -102,7 +117,7 @@ class AichiSpider(scrapy.Spider):
                     name = str(row.get('審査名', '')).strip(),
                     location = str(row.get('会場名', '')).strip(),
                     note = str(row.get('備考', '')).strip(),
-                    year = int(row.get('年')),
+                    year = row.get('year', 0),
                     month = int(row.get('月')),
                     day = day,
                 )

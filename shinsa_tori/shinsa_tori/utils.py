@@ -1,25 +1,39 @@
 import unicodedata
 import pandas as pd
+import re
 
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict
 
+CURRENT_YEAR = str(datetime.now().year)
 START_AT_PGSQL_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+RANK_VALUE = '〇'
 RANK_NAMES = ["無指定", "級", "初段", "弐段", "参段", "四段", "五段"]
+
+
+def convert_full_to_half(input: str):
+    return unicodedata.normalize('NFKC', input)
+
+def get_era_year_by_text(text: str) -> int | None:
+  match = re.search(r'([0-9０-９]+)\s*年度', text)
+
+  if not match:
+        print("警告：沒有找到任何年度資訊。")
+        return None
+
+  raw_year = match.group(1)
+  return int(convert_full_to_half(raw_year))
 
 def convert_reiwa_to_ce_year(reiwa_year: int) -> int:
     return reiwa_year + 2018
 
 # 根據日本財政年度規則，推算並回傳最乾淨的 'YYYY-MM-DD 00:00:00' 東京當地時間字串。
-def convert_date_by_fiscal_year(reiwa_year: int, month: int, day: int) -> str:
-    year = convert_reiwa_to_ce_year(reiwa_year)
-
+def convert_date_by_fiscal_year(year: int, month: int, day: int) -> str:
     fiscal_start = datetime(year, 4, 1)
     target_dt = fiscal_start.replace(month=month, day=day)
-
-    print(f'{fiscal_start}, {target_dt}')
 
     if target_dt < fiscal_start:
         target_dt = target_dt.replace(year = (year + 1))
@@ -83,7 +97,7 @@ class ShinsaEntity:
         self.note = str(data.get('note', '')).strip()
         self.type = self._get_type().value
 
-        self.start_at = self._get_start_at(
+        self.start_at = self._get_start_at_by_fiscal_year(
             self._year,
             self._month,
             self._day
@@ -103,14 +117,12 @@ class ShinsaEntity:
         else:
             return ShinsaType.LOCAL
 
-    def _get_start_at(self, reiwa_year: int, month: int, day: int) -> str:
-      year = convert_reiwa_to_ce_year(reiwa_year)
-
-      return datetime(year, month, day).strftime(START_AT_PGSQL_FORMAT)
+    def _get_start_at_by_fiscal_year(self, year: int, month: int, day: int) -> str:
+      return convert_date_by_fiscal_year(year, month, day)
 
 class RankParser:
     def __init__(self):
-        self.target_value = '〇'
+        self.target_value = RANK_VALUE
 
     def parse_row(self, row: dict) -> list:
         accepted_names = []
