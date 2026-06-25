@@ -1,15 +1,19 @@
+import io
 import unicodedata
 import pandas as pd
 import re
+import pdfplumber
 
 from datetime import datetime
 from dataclasses import dataclass
 from enum import Enum
 from typing import TypedDict
+from urllib.parse import unquote
 
 CURRENT_YEAR = str(datetime.now().year)
 START_AT_PGSQL_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+MAX_LOCAL_RANK = '四段'
 RANK_VALUE = '〇'
 RANK_NAMES = ["無指定", "級", "初段", "弐段", "参段", "四段", "五段"]
 
@@ -61,6 +65,33 @@ class ShinsaType(Enum):
 class DeliveryMethodType(Enum):
     FACING = 1
     VIDEO = 2
+
+class ShinsaYearParser:
+    @staticmethod
+    def convert_reiwa_to_ce(reiwa_year: int) -> int:
+        return 2019 + reiwa_year - 1
+
+    @staticmethod
+    def get_ce_year_by_url(url: str) -> int:
+        default_year = datetime.now().year
+
+        if not url:
+            return default_year
+
+        decoded_url = unquote(str(url))
+
+        # get ce year
+        ce_match = re.search(r'.*((?:20|21)\d{2})', decoded_url)
+        if ce_match:
+            return int(ce_match.group(1))
+
+        # get era year
+        era_match = re.search(r'.*令和(\d+)年(度)?', decoded_url)
+        if era_match:
+            reiwa_year = int(era_match.group(1))
+            return ShinsaYearParser.convert_reiwa_to_ce(reiwa_year)
+
+        return default_year
 
 class DeliveryMethodParser:
     @staticmethod
@@ -137,3 +168,55 @@ class RankParser:
                     accepted_names.append(name)
 
         return accepted_names
+
+class PDFLoader:
+    def extract_document(self, pdf_file: io.BytesIO) -> list[list]:
+        raw_tables = []
+
+        with pdfplumber.open(pdf_file, unicode_norm="NFKC") as pdf:
+            for page in pdf.pages:
+                table = page.extract_table()
+                if table:
+                    raw_tables.append(table)
+
+        return raw_tables
+
+class PDFDataCleaner:
+    def __init__(self,
+        column_mapping: dict = None,
+        column_range: tuple[int, int] = None
+    ):
+        self._column_mapping = column_mapping if column_mapping is not None else {}
+
+        self._col_slice = (
+            slice(column_range[0], column_range[1])
+            if column_range is not None
+            else slice(None)
+        )
+
+        self._renamed_column_mapping = { value: key for key, value in self._column_mapping.items() }
+
+    def clean_tables(self, raw_tables: list[list]) -> pd.DataFrame:
+        all_dfs = []
+
+        for table in raw_tables:
+            if not table or len(table) < 2:
+                continue
+
+            clean_headers = [str(cell).replace(' ', '').replace('\n', '') for cell in table[0]]
+            df_page = pd.DataFrame(table[1:], columns=clean_headers)
+
+            if not df_page.empty:
+                df_page = df_page.iloc[:, self._col_slice].copy()
+
+            if self._renamed_column_mapping:
+                df_page.rename(columns=self._renamed_column_mapping, inplace=True)
+
+            all_dfs.append(df_page)
+
+        if not all_dfs:
+            return pd.DataFrame()
+
+        df = pd.concat(all_dfs, ignore_index=True)
+
+        return df
