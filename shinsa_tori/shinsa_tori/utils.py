@@ -13,6 +13,9 @@ from urllib.parse import unquote
 CURRENT_YEAR = str(datetime.now().year)
 START_AT_PGSQL_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+MONTH_DAY_PATTERN = r'(?P<month>\d+)\s*月\s*(?P<day>\d+)\s*日'
+
+RANK_RULE = r'(無指定|初段|弐段|参段|四段|五段)'
 MAX_LOCAL_RANK = '四段'
 RANK_VALUE = '〇'
 RANK_NAMES = ["無指定", "級", "初段", "弐段", "参段", "四段", "五段"]
@@ -169,6 +172,33 @@ class RankParser:
 
         return accepted_names
 
+    def parse_rank_text(self, text: str) -> list:
+        if not text:
+            return []
+
+        accepted_ranks = []
+
+        # 處理範圍段位; 初段～四段
+        range_symbol = '~'
+        match_range = re.sub(r'[~～〜]', range_symbol, text)
+        if range_symbol in match_range:
+            start_part, end_part = match_range.split(range_symbol, 1)
+
+            is_eligible = False
+            for rank in RANK_NAMES:
+                if start_part in rank:
+                    is_eligible = True
+                if is_eligible:
+                    accepted_ranks.append(rank)
+                if rank == end_part:
+                    break
+
+            return accepted_ranks
+
+        accepted_ranks = re.findall(RANK_RULE, text)
+
+        return list(dict.fromkeys(accepted_ranks))
+
 class PDFLoader:
     def extract_document(self, pdf_file: io.BytesIO) -> list[list]:
         raw_tables = []
@@ -195,6 +225,22 @@ class PDFDataCleaner:
         )
 
         self._renamed_column_mapping = { value: key for key, value in self._column_mapping.items() }
+
+    def clean_table(self, raw_table: list[list]) -> pd.DataFrame:
+        if not raw_table or len(raw_table) < 2:
+            return pd.DataFrame()
+
+        clean_headers = [str(cell).replace(' ', '').replace('\n', '') for cell in raw_table[0]]
+
+        df = pd.DataFrame(raw_table[1:], columns=clean_headers)
+
+        if not df.empty:
+            df = df.iloc[:, self._col_slice].copy()
+
+        if self._renamed_column_mapping:
+            df.rename(columns=self._renamed_column_mapping, inplace=True)
+
+        return df
 
     def clean_tables(self, raw_tables: list[list]) -> pd.DataFrame:
         all_dfs = []
