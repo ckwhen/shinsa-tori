@@ -158,27 +158,29 @@ class RankParser:
     def __init__(self):
         self.target_value = RANK_VALUE
 
-    def parse_row(self, row: dict) -> list:
-        accepted_names = []
+    def _parse_relative_ranks(self, text: str) -> list:
+        # 找出文字中包含的基準段位 (Base Rank)
+        base_rank = None
+        for rank in RANK_NAMES:
+            if rank in text:
+                base_rank = rank
         
-        for name in RANK_NAMES:
-            col = next((k for k in row.keys() if str(k) in name), None)
-
-            if col:
-                cell_value = str(row.get(col, '')).strip()
-
-                if cell_value == self.target_value:
-                    accepted_names.append(name)
-
-        return accepted_names
-
-    def parse_rank_text(self, text: str) -> list:
-        if not text:
+        if not base_rank:
             return []
+            
+        base_idx = RANK_NAMES.index(base_rank)
+        
+        if "以下" in text:
+            return RANK_NAMES[:base_idx + 1]
+            
+        if "以上" in text:
+            return RANK_NAMES[base_idx:]
+            
+        return []
 
+    def _parse_range_ranks(self, text: str) -> list:
         accepted_ranks = []
 
-        # 處理範圍段位; 初段～四段
         range_symbol = '~'
         match_range = re.sub(r'[~～〜]', range_symbol, text)
         if range_symbol in match_range:
@@ -198,6 +200,35 @@ class RankParser:
         accepted_ranks = re.findall(RANK_RULE, text)
 
         return list(dict.fromkeys(accepted_ranks))
+
+    def parse_row(self, row: dict) -> list:
+        accepted_names = []
+        
+        for name in RANK_NAMES:
+            col = next((k for k in row.keys() if str(k) in name), None)
+
+            if col:
+                cell_value = str(row.get(col, '')).strip()
+
+                if cell_value == self.target_value:
+                    accepted_names.append(name)
+
+        return accepted_names
+
+    def parse_rank_text(self, text: str) -> list:
+        if not text:
+            return []
+
+        # 優先處理特殊複合詞："無指定級位"
+        if "無指定" in text and "級" in text:
+            return ["無指定", "級"]
+
+        # 處理相對範圍段位（以下 / 以上）
+        if "以下" in text or "以上" in text:
+            return self._parse_relative_ranks(text)
+
+        # 處理範圍段位; 初段～四段
+        return self._parse_range_ranks(text)
 
 class PDFLoader:
     def extract_document(self, pdf_file: io.BytesIO) -> list[list]:
@@ -226,6 +257,24 @@ class PDFDataCleaner:
 
         self._renamed_column_mapping = { value: key for key, value in self._column_mapping.items() }
 
+    def trim_cells(self, df: pd.DataFrame, columns: list[str] = None) -> pd.DataFrame:
+        if df.empty:
+            return df
+
+        df_copy = df.copy()
+
+        # 如果使用者沒有指定欄位，就預設抓取目前所有的欄位名稱
+        target_columns = columns if columns is not None else df_copy.columns
+        
+        for col in target_columns:
+            if col not in df_copy.columns:
+                print(f"提示：欄位 '{col}' 不在表格中，跳過此欄位。")
+                continue
+
+            df_copy[col] = df_copy[col].astype(str).str.replace(r'\s+', '', regex=True)
+                
+        return df_copy
+
     def clean_table(self, raw_table: list[list]) -> pd.DataFrame:
         if not raw_table or len(raw_table) < 2:
             return pd.DataFrame()
@@ -246,17 +295,7 @@ class PDFDataCleaner:
         all_dfs = []
 
         for table in raw_tables:
-            if not table or len(table) < 2:
-                continue
-
-            clean_headers = [str(cell).replace(' ', '').replace('\n', '') for cell in table[0]]
-            df_page = pd.DataFrame(table[1:], columns=clean_headers)
-
-            if not df_page.empty:
-                df_page = df_page.iloc[:, self._col_slice].copy()
-
-            if self._renamed_column_mapping:
-                df_page.rename(columns=self._renamed_column_mapping, inplace=True)
+            df_page = self.clean_table(table)
 
             all_dfs.append(df_page)
 
