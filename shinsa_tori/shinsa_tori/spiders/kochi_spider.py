@@ -23,7 +23,7 @@ TARGET_PDF = '//a[contains(@href, ".pdf") and contains(., "審査会日程")]/@h
 
 class KochiSpider(scrapy.Spider):
     name = "kochi_spider"
-    allowed_domains = ['aikyuren.com']
+    allowed_domains = ['kochikenkyudo.server-shared.com']
     start_urls = [SOURCE_URL]
 
     def parse(self, response):
