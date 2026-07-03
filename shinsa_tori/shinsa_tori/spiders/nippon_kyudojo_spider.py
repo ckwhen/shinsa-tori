@@ -112,11 +112,11 @@ class NipponKyudojoSpider(scrapy.Spider):
                     elif 122.0 <= val <= 153.0 and lng is None:
                         lng = clean_text
 
-            prefecture_id = None
+            prefecture_code = None
             if address:
-                for pref, pref_id in PREFECTURE_MAP.items():
+                for pref, pref_code in PREFECTURE_MAP.items():
                     if pref in address:
-                        prefecture_id = pref_id
+                        prefecture_code = pref_code
                         break
 
             raw_name = raw_dojo.xpath('.//b/text()').get()
@@ -136,7 +136,7 @@ class NipponKyudojoSpider(scrapy.Spider):
                 name=name,
                 address=address,
                 phone=phone,
-                prefecture_id=prefecture_id,
+                prefecture_code=prefecture_code,
                 latitude=lat,
                 longitude=lng,
             )
