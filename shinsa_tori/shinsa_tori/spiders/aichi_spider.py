@@ -15,6 +15,7 @@ from shinsa_tori.utils import (
     normalize_df
 )
 
+FEDERATION_NAME = '愛知県弓道連盟'
 SOURCE_URL = 'http://www.aikyuren.com/shinsanittei.html'
 TARGET_PDF = '//a[contains(@href, ".pdf") and contains(., "地方審査日程")]/@href'
 
@@ -141,6 +142,7 @@ class AichiSpider(scrapy.Spider):
                     'start_at': shinsa.start_at,
                     'delivery_method_type': shinsa.delivery_method_type,
                     'note': shinsa.note,
+                    'federation_name': FEDERATION_NAME,
 
                     'ranks': rank_dicts
                 }

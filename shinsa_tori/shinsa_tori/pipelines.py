@@ -40,12 +40,17 @@ class ShinsaToriPipeline:
                         location,
                         delivery_method_type,
                         start_at,
-                        note
+                        note,
+                        federation_id
                     )
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s,
+                        (SELECT id FROM federations WHERE name = %s LIMIT 1)
+                    )
                     ON CONFLICT (name, location, start_at)
                     DO UPDATE SET
                         note = EXCLUDED.note,
+                        federation_id = EXCLUDED.federation_id,
                         updated_at = CURRENT_TIMESTAMP
                     RETURNING id;
                 """
@@ -55,7 +60,8 @@ class ShinsaToriPipeline:
                     item['location'],
                     item['delivery_method_type'],
                     item['start_at'],
-                    item['note']
+                    item.get('note'),
+                    item['federation_name']
                 ))
 
                 actual_shinsa_id = cur.fetchone()[0]

@@ -16,7 +16,7 @@ from shinsa_tori.utils import (
     PDFDataCleaner
 )
 
-DISTRICT_NAME = '第一地区'
+FEDERATION_NAME = '東京都弓道連盟 第一地区'
 SOURCE_URL = 'https://kyudo-tokyo1.jp/%e5%b9%b4%e9%96%93%e8%a1%8c%e4%ba%8b%e4%ba%88%e5%ae%9a/'
 TARGET_PDF = '//a[contains(@href, ".pdf") and contains(., "第一地区行事予定")]/@href'
 
@@ -99,7 +99,6 @@ class TokyoDistrictOneSpider(scrapy.Spider):
                 year = curr_year,
                 month = row.get('month', 0),
                 day = row.get('day', 0),
-                note = DISTRICT_NAME,
             )
 
             shinsa = ShinsaEntity(
@@ -116,6 +115,7 @@ class TokyoDistrictOneSpider(scrapy.Spider):
                 'start_at': shinsa.start_at,
                 'delivery_method_type': shinsa.delivery_method_type,
                 'note': shinsa.note,
+                'federation_name': FEDERATION_NAME,
 
                 'ranks': rank_dicts
             }
