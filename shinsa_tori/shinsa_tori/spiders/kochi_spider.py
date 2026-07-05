@@ -18,6 +18,7 @@ from shinsa_tori.utils import (
     normalize_df
 )
 
+FEDERATION_NAME = '高知県弓道連盟'
 SOURCE_URL = 'http://www.kochikenkyudo.server-shared.com/shinsa/shinsa-chuo/'
 TARGET_PDF = '//a[contains(@href, ".pdf") and contains(., "審査会日程")]/@href'
 
@@ -148,6 +149,7 @@ class KochiSpider(scrapy.Spider):
                 'location': shinsa.location,
                 'start_at': shinsa.start_at,
                 'delivery_method_type': shinsa.delivery_method_type,
+                'federation_name': FEDERATION_NAME,
 
                 'ranks': rank_dicts
             }

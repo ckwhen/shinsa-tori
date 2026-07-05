@@ -9,6 +9,7 @@ class ShinsaItem(scrapy.Item):
     candidate_type = scrapy.Field()
     delivery_method_type = scrapy.Field()
     note = scrapy.Field()
+    federation_name = scrapy.Field()
 
     ranks = scrapy.Field()
 

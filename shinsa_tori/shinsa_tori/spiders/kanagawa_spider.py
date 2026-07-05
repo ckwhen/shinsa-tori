@@ -14,6 +14,7 @@ from shinsa_tori.utils import (
     PDFDataCleaner
 )
 
+FEDERATION_NAME = '神奈川県弓道連盟'
 SOURCE_URL = 'https://www.kyudo-kanagawa.jp/sinsa/sinsa_1.html'
 TARGET_PDF = '//a[contains(@href, ".pdf") and contains(., "地方審査会")]/@href'
 
@@ -128,6 +129,7 @@ class KanagawaSpider(scrapy.Spider):
                 'start_at': shinsa.start_at,
                 'delivery_method_type': shinsa.delivery_method_type,
                 'note': shinsa.note,
+                'federation_name': FEDERATION_NAME,
 
                 'ranks': rank_dicts
             }

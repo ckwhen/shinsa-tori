@@ -13,7 +13,7 @@ from shinsa_tori.utils import (
 
 BR_REGEX = r'<[bB][rR]\s*/?>'
 
-DISTRICT_NAME = '第三地区'
+FEDERATION_NAME = '東京都弓道連盟 第三地区'
 SOURCE_URL = 'http://www.kyudo-tokyo3.jp/shinsa_toppage.html'
 
 class TokyoDistrictThreeSpiderSpider(scrapy.Spider):
@@ -59,7 +59,7 @@ class TokyoDistrictThreeSpiderSpider(scrapy.Spider):
                     year = curr_year,
                     month = date_obj.month,
                     day = date_obj.day,
-                    note = f'{DISTRICT_NAME}, {note}',
+                    note = note,
                 )
                 shinsa = ShinsaEntity(
                     data = shinsa_data,
@@ -72,6 +72,7 @@ class TokyoDistrictThreeSpiderSpider(scrapy.Spider):
                     'start_at': shinsa.start_at,
                     'delivery_method_type': shinsa.delivery_method_type,
                     'note': shinsa.note,
+                    'federation_name': FEDERATION_NAME,
 
                     'ranks': accepted_ranks
                 }
