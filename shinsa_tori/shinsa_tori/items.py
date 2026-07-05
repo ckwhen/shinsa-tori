@@ -11,3 +11,16 @@ class ShinsaItem(scrapy.Item):
     note = scrapy.Field()
 
     ranks = scrapy.Field()
+
+class KyudojoItem(scrapy.Item):
+    name = scrapy.Field()
+    address = scrapy.Field()
+    phone = scrapy.Field()
+    prefecture_code = scrapy.Field()
+    latitude = scrapy.Field()
+    longitude = scrapy.Field()
+
+class FederationItem(scrapy.Item):
+    name = scrapy.Field()
+    prefecture_code = scrapy.Field()
+    region_name = scrapy.Field()
