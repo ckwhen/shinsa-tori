@@ -1,7 +1,7 @@
 from shinsa_tori.database.connect import get_db_pool
 
 from scrapy.exceptions import DropItem
-from shinsa_tori.items import ShinsaItem, KyudojoItem
+from shinsa_tori.items import ShinsaItem, FederationItem, KyudojoItem
 
 class ShinsaToriPipeline:
     def __init__(self, crawler=None):
@@ -82,6 +82,73 @@ class ShinsaToriPipeline:
             raise DropItem(f"無法寫入資料庫: {item['name']}")
 
         finally:
+            self.db_pool.putconn(conn)
+
+        return item
+
+    def close_spider(self):
+        pass
+
+class FederationPipeline:
+    def __init__(self, crawler=None):
+        self.db_pool = None
+        self.crawler = crawler
+
+    @classmethod
+    def from_crawler(cls, crawler):
+        return cls(crawler=crawler)
+
+    def open_spider(self):
+        if self.db_pool is None:
+            try:
+                self.db_pool = get_db_pool()
+                if self.crawler and self.crawler.spider:
+                    self.crawler.spider.logger.info("--- FederationPipeline 資料庫連線池初始化成功 ---")
+            except Exception as e:
+                if self.crawler and self.crawler.spider:
+                    self.crawler.spider.logger.error(f"❌ FederationPipeline 連線池建立失敗: {e}")
+
+    def process_item(self, item, spider):
+        if not isinstance(item, FederationItem):
+            return item
+
+        if not self.db_pool:
+            return item
+
+        conn = self.db_pool.getconn()
+
+        try:
+            with conn.cursor() as cur:
+                insert_federation_sql = """
+                    INSERT INTO federations (
+                        name, 
+                        prefecture_code, 
+                        region_id
+                    )
+                    SELECT 
+                        %s, 
+                        %s, 
+                        (SELECT id FROM regions WHERE name_ja LIKE %s || '%%')
+                    ON CONFLICT (name) 
+                    DO NOTHING;
+                """
+
+                cur.execute(insert_federation_sql, (
+                    item['name'],
+                    item['prefecture_code'],
+                    item['region_name']
+                ))
+
+            conn.commit()
+            spider.logger.info(f"✨ [純 SQL 同步成功] 地方連盟: {item['name']} ({item['region_name']})")
+
+        except Exception as e:
+            conn.rollback()
+            spider.logger.error(f"❌ [純 SQL 寫入失敗] 事務已回滾。連盟: {item['name']}，原因: {e}")
+            raise DropItem(f"無法寫入資料庫: {item['name']}")
+
+        finally:
+            # 100% 延用您的釋放連線回池風格
             self.db_pool.putconn(conn)
 
         return item

@@ -19,3 +19,8 @@ class KyudojoItem(scrapy.Item):
     prefecture_code = scrapy.Field()
     latitude = scrapy.Field()
     longitude = scrapy.Field()
+
+class FederationItem(scrapy.Item):
+    name = scrapy.Field()
+    prefecture_code = scrapy.Field()
+    region_name = scrapy.Field()

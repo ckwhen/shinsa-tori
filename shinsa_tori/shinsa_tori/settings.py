@@ -64,6 +64,7 @@ DOWNLOAD_DELAY = 2
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
    "shinsa_tori.pipelines.ShinsaToriPipeline": 800,
+   "shinsa_tori.pipelines.FederationPipeline": 850,
    "shinsa_tori.pipelines.KyudojoPipeline": 900,
 }
 
