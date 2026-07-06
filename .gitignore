@@ -217,3 +217,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+shinsa_tori/shinsa_tori/manual_excels/
