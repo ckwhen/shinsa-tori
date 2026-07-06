@@ -41,26 +41,40 @@ class ShinsaToriPipeline:
                         delivery_method_type,
                         start_at,
                         note,
-                        federation_id
+                        federation_id,
+                        kyudojo_id
                     )
                     VALUES (
                         %s, %s, %s, %s, %s, %s,
-                        (SELECT id FROM federations WHERE name = %s LIMIT 1)
+                        (SELECT id FROM federations WHERE name = %s LIMIT 1),
+                        (
+                            SELECT k.id
+                            FROM kyudojos k
+                            JOIN federations f ON k.prefecture_code = f.prefecture_code
+                            CROSS JOIN (SELECT %s AS loc, %s AS fed_name) tmp
+                            WHERE f.name = tmp.fed_name
+                              AND similarity(k.name, tmp.loc) >= 0.6
+                            ORDER BY similarity(k.name, tmp.loc) DESC
+                            LIMIT 1
+                        )
                     )
                     ON CONFLICT (name, location, start_at)
                     DO UPDATE SET
                         note = EXCLUDED.note,
                         federation_id = EXCLUDED.federation_id,
+                        kyudojo_id = EXCLUDED.kyudojo_id,
                         updated_at = CURRENT_TIMESTAMP
                     RETURNING id;
                 """
                 cur.execute(upsert_shinsa_sql, (
                     item['name'],
                     item['type'],
-                    item['location'],
+                    item.get('location'),
                     item['delivery_method_type'],
                     item['start_at'],
                     item.get('note'),
+                    item['federation_name'],
+                    item.get('location'),
                     item['federation_name']
                 ))
 
