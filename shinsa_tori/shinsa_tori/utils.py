@@ -14,6 +14,7 @@ CURRENT_YEAR = str(datetime.now().year)
 START_AT_PGSQL_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 MONTH_DAY_PATTERN = r'(?P<month>\d+)\s*月\s*(?P<day>\d+)\s*日'
+MONTH_DAY_SLASH_PATTERN = r'(?P<month>\d{1,2})\s*[／/]\s*(?P<day>\d{1,2})'
 
 RANK_RULE = r'(無指定|初段|弐段|参段|四段|五段)'
 MAX_LOCAL_RANK = '四段'
@@ -46,6 +47,12 @@ def convert_date_by_fiscal_year(year: int, month: int, day: int) -> str:
         target_dt = target_dt.replace(year = (year + 1))
 
     return target_dt.strftime(START_AT_PGSQL_FORMAT)
+
+def strip_whitespace(input: str) -> str:
+    return input.replace(" ", "").replace("　", "")
+
+def collapse_whitespace(input: str) -> str:
+    return re.sub(r'\s+', ' ', input).strip()
 
 # DataFrame 欄位 Unicode 正規化
 def normalize_df(df: pd.DataFrame, columns: list) -> pd.DataFrame:
