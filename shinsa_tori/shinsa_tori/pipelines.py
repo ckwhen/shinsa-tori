@@ -1,7 +1,39 @@
-from shinsa_tori.database.connect import get_db_pool
+import hashlib
 
+from scrapy.pipelines.files import FilesPipeline
 from scrapy.exceptions import DropItem
-from shinsa_tori.items import ShinsaItem, FederationItem, KyudojoItem
+from scrapy.http import Request
+from shinsa_tori.database.connect import get_db_pool
+from shinsa_tori.items import (
+    ShinsaItem,
+    FederationItem,
+    KyudojoItem,
+    DocumentItem
+)
+
+class ShinsaToriFilesPipeline(FilesPipeline):
+    def get_media_requests(self, item, info):
+        if not isinstance(item, DocumentItem):
+            return
+
+        for file_url in item.get('file_urls', []):
+            yield Request(
+                file_url, 
+                meta={
+                    'title': item.get('title'),
+                    'year': item.get('year')
+                }
+            )
+
+    def file_path(self, request, response=None, info=None, *, item=None):
+        url_hash = hashlib.shake_256(request.url.encode()).hexdigest(5)
+
+        year = request.meta.get('year')
+        title = request.meta.get('title')
+
+        custom_filename = f"{year}_{title}_{url_hash}.pdf"
+        
+        return f"full/{custom_filename}"
 
 class ShinsaToriPipeline:
     def __init__(self, crawler=None):
