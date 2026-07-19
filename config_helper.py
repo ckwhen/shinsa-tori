@@ -2,67 +2,83 @@ import sys
 import os
 import yaml
 
-def load_config(config_path="config.yaml"):
+from pathlib import Path
+from loguru import logger
+
+def setup_global_logger(log_dir: str = "logs", screen_level: str = "INFO"):
+    """全域唯一初始化日誌的入口"""
+    Path(log_dir).mkdir(parents=True, exist_ok=True)
+
+    logger.remove()
+
+    # 終端機彩色輸出
+    logger.add(
+        sys.stderr,
+        level=screen_level
+    )
+
+    logger.add(
+        os.path.join(log_dir, "pipeline_{time:YYYY-MM-DD}.log"), 
+        rotation="10 MB",
+        retention="14 days",
+        compression="zip",
+        level="DEBUG"
+    )
+
+def load_config(config_path: str) -> dict:
     """
-    [全域基礎函數] 
-    單純讀取整個 config.yaml，不限制特定縣市。
-    支援全域參數（如 database, shared_paths）與 Loader 模組讀取。
+    全域基礎函數：
+    讀取 config.yaml 檔案，支援 YAML 錨點與全域參數共享。
     """
     if not os.path.exists(config_path):
-        raise FileNotFoundError(f"❌ 找不到設定檔：{config_path}")
+        logger.error(f"Configuration infrastructure missing: Target file not found at '{config_path}'")
+        raise FileNotFoundError(f"Critical configuration file missing: {config_path}")
 
     with open(config_path, "r", encoding="utf-8") as f:
-        # 使用 FullLoader 以支援 YAML 錨點與引用
         config = yaml.load(f, Loader=yaml.FullLoader)
         
     return config if config else {}
 
-def load_config_by_prefecture(config_path="config.yaml", prefecture="chiba"):
+def load_config_by_prefecture(config_path: str, prefecture: str) -> dict:
     """
-    [縣市特化函數] 
-    讀取 config.yaml 並專門取得指定縣市（如 chiba, tokyo）的獨立區塊設定。
-    適用於 Extractor 與 Transformer 階段。
+    縣市特化函數：
+    讀取指定設定檔，並提取特定縣市（如 chiba, tokyo）的獨立配置區塊。
     """
-    # 呼叫基礎函數取得完整的 config 字典
     config = load_config(config_path)
 
     prefecture_config = config.get(prefecture)
 
     if not prefecture_config:
-        raise KeyError(
-            f"❌ 在 {config_path} 中找不到該縣市的設定區塊: {prefecture}"
-        )
-
+        logger.error(f"Configuration block missing: Prefecture section '{prefecture}' not found in '{config_path}'")
+        raise KeyError(f"Target prefecture configuration block not found: {prefecture}")
+    
+    logger.debug(f"Prefecture configuration block successfully extracted: '{prefecture}' from '{config_path}'")
     return prefecture_config
 
-def validate_and_format_prefecture(name):
+def validate_and_format_prefecture(name: str) -> str:
     """
-    [全域共用防禦函數]
-    嚴格驗證縣市引數是否合法，並自動執行去頭尾空格、轉換小寫的標準化流程。
-    若驗證失敗，印出紅牌警告並中止 Python 行程。
+    全域共用防禦函數：
+    執行去頭尾空格、轉換小寫的標準化流程，並驗證 config.yaml 與縣市設定區塊存在性。
     """
-
     if not name or not isinstance(name, str) or name.strip() == "":
-        print("\n❌ 啟動失敗：必須指定明確的縣市代號文字（例如 'chiba'）！")
+        logger.error("Argument validation failed: Input prefecture name is empty or not a string")
         sys.exit(1)
 
     clean_name = name.strip().lower()
-    
-    # 規格進階防禦：檢查 config.yaml 是否存在，且裡面有沒有這個縣市的設定
+
     try:
-        # 借用現有的全域配置函數，確認檔案存在
         config = load_config("config.yaml")
-        
-        # 檢查 config 的第一層有沒有這個縣市的 Key
+
         if clean_name not in config:
-            print(f"\n❌ 規格錯誤：雖然 config.yaml 存在，但設定檔中找不到 [{clean_name}] 這個縣市的配置區塊！")
+            logger.error(f"Configuration profile missing: '{clean_name}' block not found in config.yaml")
             sys.exit(1)
             
     except FileNotFoundError:
-        print("\n❌ 災難錯誤：在專案根目錄找不到關鍵的 [config.yaml] 設定檔，請先建立它！")
+        logger.critical("Infrastructure error: Critical file 'config.yaml' not found in project root")
         sys.exit(1)
     except Exception as e:
-        print(f"\n❌ 設定檔讀取發生未知錯誤: {e}")
+        logger.exception(f"Configuration read error: Failed to parse config.yaml due to unexpected exception")
         sys.exit(1)
 
+    logger.debug(f"Prefecture parameter sanitized and verified: '{clean_name}'")
     return clean_name
