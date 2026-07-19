@@ -219,5 +219,6 @@ __marimo__/
 .streamlit/secrets.toml
 
 shinsa_tori/shinsa_tori/manual_excels/
+shinsa_tori/outputs/
 
 .DS_Store

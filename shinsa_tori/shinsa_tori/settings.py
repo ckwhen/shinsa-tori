@@ -63,14 +63,17 @@ DOWNLOAD_DELAY = 2
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
+    "shinsa_tori.pipelines.ShinsaToriFilesPipeline": 1,
    "shinsa_tori.pipelines.ShinsaToriPipeline": 800,
    "shinsa_tori.pipelines.FederationPipeline": 850,
    "shinsa_tori.pipelines.KyudojoPipeline": 900,
 }
 
+FILES_STORE = 'downloads'
+
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html
-#AUTOTHROTTLE_ENABLED = True
+AUTOTHROTTLE_ENABLED = True
 # The initial download delay
 #AUTOTHROTTLE_START_DELAY = 5
 # The maximum download delay to be set in case of high latencies

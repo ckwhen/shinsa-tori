@@ -1,5 +1,12 @@
 import scrapy
 
+class DocumentItem(scrapy.Item):
+    file_urls = scrapy.Field()
+    files = scrapy.Field()
+
+    title = scrapy.Field()
+    year = scrapy.Field()
+
 class ShinsaItem(scrapy.Item):
     id = scrapy.Field()
     name = scrapy.Field()
