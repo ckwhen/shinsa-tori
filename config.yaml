@@ -1,0 +1,46 @@
+# =====================================================================
+# 全域共用變數與路徑設定 (未來修改此處，全專案 47 縣市同步更改)
+# =====================================================================
+shared_paths:
+  input_folder: &base_input "./shinsa_tori/downloads"
+  output_folder: &base_output "./shinsa_tori/outputs"
+
+# =====================================================================
+# 🎯 縣市任務設定區 (共 47 個縣市，此處以 chiba 千葉縣為例)
+# =====================================================================
+chiba:
+  federation_name: "千葉県弓道連盟"
+  extract:
+    start_urls:
+      - "https://chiba-kyudo.jp"  # 範例：千葉縣弓道連盟審查公告網頁
+    pdf_link_css: "div.news-list a[href$='.pdf']::attr(href)"  # 只抓取 .pdf 結尾的連結
+    excel_compatible: true  # 輸出 utf-8-sig，確保 Excel 開啟中文不亂碼
+    download_folder: *base_input
+    download_delay: 2.0
+
+  transform:
+    input_folder: *base_input
+    output_folder: *base_output
+    date_extract_type: "combined_text"
+    ignore_keywords:
+      - "審査日"
+      - "審査会名称"
+      - "級位・段位"
+      - "審 査 料"
+      - "登録料"
+      - "連合審査"
+    ffill_columns:
+      - "col_0"
+    shinsa_columns_map:
+      col_0: "candidate_type"
+      col_1: "start_at"
+      col_2: "name"
+      col_3: "location"
+    ranks_setup:
+      source_column: "name"
+      parse_type: "peer_to_peer"
+      text_regex: '.*\((?P<ranks_text>[^)]+)\)'
+    note_columns_map:
+      col_4: "支部締切"
+      col_5: "審査部締切"
+      col_7: "雨待機場所"
