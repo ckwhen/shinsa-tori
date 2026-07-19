@@ -1,16 +1,23 @@
-import sys
 import csv
 import pdfplumber
 import config_helper
 
+from loguru import logger
 from pathlib import Path
 
 def stream_pdf_rows(pdf):
+    """
+    產生器函數：
+    橫向榨取 PDF 各頁表格，並自動降維輸出附帶座標（頁碼、表號、行號）的扁平資料流。
+    """
     for page_num, page in enumerate(pdf.pages, start=1):
         tables = page.extract_tables()
         if not tables:
+            # logger.trace(f"Page {page_num} contains no extractable tables")
             continue
-            
+
+        logger.debug(f"Parsing page {page_num}/{len(pdf.pages)} | Found {len(tables)} table(s)")
+
         for t_idx, table in enumerate(tables, start=1):
             for r_idx, row in enumerate(table, start=1):
                 # 用 yield 把每一列的資訊打包丟出去
@@ -18,12 +25,12 @@ def stream_pdf_rows(pdf):
 
 def extract_pdf_tables(prefecture):
     """
-    📥 [Extract 階段 - 第二步: Extractor]
-    暴力拆解 PDF 中的網格線條，將其降維打擊成結構化的 col_0 ~ col_9 原始矩陣。
+    Extract 階段：
+    解析指定縣市的 PDF 表格，並轉換為結構化的原始矩陣檔案。
     """
-    print(f"🕵️‍♂️ [Extract - Extractor] 正在啟動 [{prefecture}] 任務的表格抽取...")
+    logger.info(f"[{prefecture}] Starting table extraction from PDF files")
 
-    # 透過共用 utils 讀取設定
+    # 讀取設定檔與特化區塊
     try:
         pref_config = config_helper.load_config_by_prefecture(
             config_path="config.yaml",
@@ -31,8 +38,8 @@ def extract_pdf_tables(prefecture):
         )
         extract_settings = pref_config.get("extract", {})
     except Exception as e:
-        print(f"❌ Extractor 初始化設定失敗: {e}")
-        return
+        logger.exception(f"[{prefecture}] Extractor initialization failed: Configuration block load error")
+        raise e
 
     # 定義輸入與輸出路徑
     input_dir = Path(extract_settings.get("download_folder", "./shinsa_tori/downloads"))
@@ -43,13 +50,15 @@ def extract_pdf_tables(prefecture):
         "utf-8-sig" if extract_settings.get("excel_compatible", True) else "utf-8"
     )
 
+    logger.debug(f"[{prefecture}] Scanning input file directory: '{pdf_dir}'")
+
     if not pdf_dir.exists():
-        print(f"❌ 錯誤：找不到原始 PDF 目錄 [{pdf_dir}]，請先執行 Spider。")
-        return
+        logger.error(f"[{prefecture}] Directory error: Target source folder '{pdf_dir}' does not exist")
+        raise FileNotFoundError(f"Source PDF directory missing: {pdf_dir}")
 
     pdf_files = list(pdf_dir.glob("*.pdf"))
-    print(f"📂 來源目錄: {pdf_dir}")
-    print(f"📂 尋找到 {len(pdf_files)} 個 PDF，開始全自動網格線橫向榨取...")
+
+    logger.info(f"[{prefecture}] Scan completed | Found {len(pdf_files)} PDF files to process")
 
     # 定義中繼欄位 + 10 個寬度容納列
     csv_headers = [
@@ -65,7 +74,8 @@ def extract_pdf_tables(prefecture):
     total_tables_extracted = 0
 
     for pdf_path in pdf_files:
-        # 拆解 Spider 留下的帶年份與雜湊的漂亮檔名 (2026_chiba_14fd0e2d31.pdf)
+        logger.debug(f"[{prefecture}] Opening file for parsing: '{pdf_path.name}'")
+
         file_name_without_ext = pdf_path.stem
         parts = file_name_without_ext.split("_")
         
@@ -103,10 +113,10 @@ def extract_pdf_tables(prefecture):
                         r_idx
                     ] + clean_row)
 
-            print(f"✅ 成功榨出表格: {pdf_path.name}")
+            logger.info(f"[{prefecture}] Parsed file successfully: '{pdf_path.name}' | Extracted {len(raw_pdf_items)} rows")
 
         except Exception as e:
-            print(f"⚠️ 檔案 [{pdf_path.name}] 無法提取網格表格，已跳過: {e}")
+            logger.exception(f"[{prefecture}] Skip file | Failed to extract tables from: '{pdf_path.name}'")
             continue
 
         # RAW CSV 初始設定
@@ -118,26 +128,19 @@ def extract_pdf_tables(prefecture):
         )
         raw_table_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # 準備寫入 RAW CSV
+        logger.debug(f"[{prefecture}] Writing records to disk: '{raw_table_path}'")
+
         with open(raw_table_path, mode="w", encoding=encoding_choice, newline="") as f:
             writer = csv.writer(f)
             writer.writerow(csv_headers)
             writer.writerows(raw_pdf_items)
 
-    print("\n==================================================")
-    print(f"🎉 成果回報 | 階段 1 (Extract) 之 Extractor 任務成功！")
-    print(f"📊 共計從 PDF 抽取並還原了 {total_tables_extracted} 個實體表格。")
-    print(f"💾 結構化中繼 Staging 檔已落地 ➔ {raw_table_path.resolve()}")
-    print("==================================================")
+    logger.info(f"[{prefecture}] Extraction pipeline finished | Total tables extracted: {total_tables_extracted} | Output file: '{raw_table_path.resolve() if raw_table_path else 'None'}'")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("\n❌ 啟動失敗：執行時必須在後方指定縣市代號！")
-        print("💡 正確執行範例： python pdf_extractor.py chiba")
-        sys.exit(1)
+    # 局部除錯
+    config_helper.setup_global_logger(log_dir="logs", screen_level="DEBUG")
+    debug_target = "chiba"
+    logger.info(f"Local debug mode | Executing pdf_extractor.py independently for: {debug_target}")
 
-    target_prefecture = config_helper.validate_and_format_prefecture(sys.argv[1])
-
-    print(f"\n🎯 [工作流啟動] 已成功鎖定標準目標縣市: {target_prefecture}")
-
-    extract_pdf_tables(prefecture=target_prefecture)
+    extract_pdf_tables(prefecture=debug_target)

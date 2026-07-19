@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import config_helper
 
+from loguru import logger
 from pathlib import Path
 
 EMPTY_CELLS_TOLERANCE = 3
@@ -23,17 +24,18 @@ RANK_ABBREVIATION_MAP = {
 
 def parse_ranks_semantic(input: str, parse_type: str) -> str:
     """
-    型態 1：點對點條列型 (無指定・初段・参段)
+    段位語義解析核心：
+    依據解析規格（如 peer_to_peer）解構原始文字並映射為標準段位標籤。
     """
     if not input or pd.isna(input):
         return ""
     
-    input = str(input).strip()
+    clean_input = str(input).strip()
     result_set = set()
 
     # 💡 型態 1：一個蘿蔔一個坑 (無指定・初段・参段)
     if parse_type == "peer_to_peer":
-        tokens = re.split(r"[・,、/]", input)
+        tokens = re.split(r"[・,、/]", clean_input)
         for t in tokens:
             norm_t = RANK_ABBREVIATION_MAP.get(t, t)
 
@@ -44,19 +46,21 @@ def parse_ranks_semantic(input: str, parse_type: str) -> str:
                 result_set.add(norm_t)
 
     if not result_set:
+        logger.debug(f"Rank semantic parsing returned empty result | Input: '{clean_input}' | Type: '{parse_type}'")
         return ""
         
     sorted_output = [r for r in RANK_NAMES if r in result_set]
+    parsed_ranks_str = " | ".join(sorted_output)
+    logger.trace(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
 
-    return " | ".join(sorted_output)
+    return parsed_ranks_str
 
 def transform_raw_data(prefecture):
     """
-    [Transform 階段]
-    讀取 Staging 原始 CSV 矩陣，執行多重欄位特徵清洗與過濾，
-    移除重複表頭與多餘雜訊，並依據 YAML 設定檔轉換為標準 ShinsaItem 數據結構。
+    Transform 階段：
+    讀取 Staging 原始 CSV 矩陣，執行多重欄位特徵清洗與合併。
     """
-    print(f"Transform: 正在啟動 [{prefecture}] 任務的 CSV 數據清洗流程...")
+    logger.info(f"[{prefecture}] Starting CSV data transformation and cleaning pipeline")
 
     # 設定檔初始化
     try:
@@ -66,38 +70,41 @@ def transform_raw_data(prefecture):
         )
         transform_settings = pref_config.get("transform", {})
     except Exception as e:
-        print(f"❌ Transformer 初始化設定失敗: {e}")
-        return
+        logger.exception(f"[{prefecture}] Transformer initialization failed: Configuration block load error")
+        raise e
 
     # 定義輸入與輸出路徑
     input_dir = Path(transform_settings.get("input_folder", "./shinsa_tori/downloads"))
     output_dir = Path(transform_settings.get("output_folder", "./shinsa_tori/outputs"))
 
+    logger.debug(f"[{prefecture}] Scanning Staging CSV directory: '{input_dir}'")
+
     if not input_dir.exists():
-        print(f"❌ 錯誤：找不到 RAW CSV 目錄 [{input_dir}]，請先執行 Extractor。")
-        return
+        logger.error(f"[{prefecture}] Directory error: Staging folder '{input_dir}' does not exist")
+        raise FileNotFoundError(f"Staging CSV directory missing: {input_dir}")
 
     raw_csv_files = list(input_dir.glob(f"*_{prefecture}_*.csv"))
 
     if len(raw_csv_files) == 0:
-        print(f"❌ 錯誤：在 [{input_dir}] 找不到任何符合 *_{prefecture}_raw.csv 的檔案。")
-        return
+        logger.error(f"[{prefecture}] Data missing: No matching *_{prefecture}_*.csv files found in '{input_dir}'")
+        raise FileNotFoundError(f"No Staging CSV files found for prefecture: {prefecture}")
 
-    print(f"📂 尋找到 {len(raw_csv_files)} 個年份的 CSV 檔案，開始合併載入...")
+    logger.info(f"[{prefecture}] Loading and merging {len(raw_csv_files)} CSV files into memory")
 
-    # 載入該連盟 RAW CSV
-    df_list = [
-        pd.read_csv(csv_path, encoding="utf-8-sig", encoding_errors="replace")
-        for csv_path in raw_csv_files
-    ]
-    raw_df = pd.concat(df_list, ignore_index=True)
+    try:
+        df_list = [
+            pd.read_csv(csv_path, encoding="utf-8-sig", encoding_errors="replace")
+            for csv_path in raw_csv_files
+        ]
+        raw_df = pd.concat(df_list, ignore_index=True)
+    except Exception as e:
+        logger.exception(f"[{prefecture}] DataFrame merge failed: Pandas I/O or concatenation error")
+        raise e
 
-    # 直接用 [0] 拿出那唯一一個檔案的路徑，徹底消滅迴圈
+    # 鎖定目標檔案（以第一個檔案為基準作為日誌上下文）
     csv_path = raw_csv_files[0]
 
-    print(f"📂 來源目錄: {input_dir}")
-    print(f"🎯 目標縣市: {prefecture}")
-    print(f"📄 鎖定唯一目標檔案，開始資料清洗: {csv_path.name}")
+    logger.info(f"[{prefecture}] DataFrame merged successfully | Total raw rows: {len(raw_df)} | Primary baseline file: '{csv_path.name}'")
 
     # =====================================================================
     # Preparation: 讀取 YAML 中的核心設定
@@ -115,27 +122,37 @@ def transform_raw_data(prefecture):
 
     current_year = csv_path.name.split("_")[0]
 
+    logger.debug(f"[{prefecture}] Loading csv string profile from: '{csv_path.name}'")
     raw_df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
     if raw_df.empty:
-        print("⚠️ 原始 CSV 檔案內容為空。")
-        return
+        logger.error(f"[{prefecture}] Data validation error: Source DataFrame is completely empty from '{csv_path.name}'")
+        raise ValueError(f"Source raw data file is empty: {csv_path.name}")
 
     # =====================================================================
     # Phase 1: 清除可能的無效資料
     # =====================================================================
+    initial_row_count = len(raw_df)
+    logger.debug(f"[{prefecture}] Initiating Phase 1 row filtration | Initial rows: {initial_row_count}")
+
     # 取得每列平均有效資料格數，用以清除無效行
     valid_cells_per_row = ((raw_df != "") & raw_df.notna()).sum(axis=1)
     mean_valid_cells = valid_cells_per_row.mean()
     dynamic_threshold = mean_valid_cells - EMPTY_CELLS_TOLERANCE
+
+    # 執行密度過濾
     raw_df = raw_df[valid_cells_per_row >= dynamic_threshold]
+    after_density_count = len(raw_df)
 
     # 依據 ignore_keywords 移除所有包含 keyword 的列
     is_any_keyword = raw_df.isin(ignore_keywords).any(axis=1)
     raw_df = raw_df[~is_any_keyword]
+    logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
 
+    final_phase_count = len(raw_df)
+    logger.info(f"[{prefecture}] Phase 1 filtration completed | Removed {initial_row_count - final_phase_count} noise rows | Remaining rows: {final_phase_count}")
     if raw_df.empty:
-        print("⚠️ 經過 Phase 1 過濾後，已無有效審查日程資料。")
-        return
+        logger.error(f"[{prefecture}] Integrity failure: Zero records remained after Phase 1 keyword filtering")
+        raise ValueError(f"Data survival check failed: All rows filtered out as noise for prefecture {prefecture}")
 
     # =====================================================================
     # Phase 2: 開始清洗 shinsa 所需資料
@@ -145,7 +162,7 @@ def transform_raw_data(prefecture):
     # 依據 ffill_columns 填補指定欄位中的 rowspan
     existing_ffill_cols = [col for col in ffill_cols if col in clean_df.columns]
     if not existing_ffill_cols:
-        print("⚠️ 警告: YAML 中設定的 ffill_columns 在資料表中皆不存在，跳過填充。")
+        logger.warning(f"[{prefecture}] Metadata discrepancy: Configured ffill_columns '{ffill_cols}' do not exist in DataFrame")
     else:
         # 將指定欄位中的「空字串」與「純空格」先轉成可以使用 ffill 的 NaN
         for col in existing_ffill_cols:
@@ -157,8 +174,9 @@ def transform_raw_data(prefecture):
         # 防呆: 將 NaN 轉回空字串
         clean_df[existing_ffill_cols] = clean_df[existing_ffill_cols].fillna("")
         
-        print(f"已成功向下補全合併儲存格欄位: {existing_ffill_cols}")
+        logger.debug(f"[{prefecture}] Rowspan padding applied successfully for columns: {existing_ffill_cols}")
 
+    # 全量去頭尾空格
     clean_df = clean_df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 
     # 補足其餘 shinsa 必要標準欄位
@@ -203,17 +221,19 @@ def transform_raw_data(prefecture):
         errors="coerce"
     )
     clean_df["start_at"] = final_start_at.dt.strftime("%Y-%m-%d %H:%M:%S").fillna("")
+    logger.debug(f"[{prefecture}] Fiscal calendar synchronization applied to datetime features")
 
     # 依據 ranks_setup 提取受審段位
     if rank_source_column not in clean_df.columns:
-        print(f"⚠️ 警告: 找不到 YAML 指定的段位來源欄位 [{rank_source_column}]，將跳過段位提取。")
+        logger.warning(f"[{prefecture}] Rank extraction bypassed: Source column '{rank_source_column}' not found in DataFrame")
     else:
         extracted_ranks_text = clean_df[rank_source_column].astype(str).str.extract(ranks_text_regex)
         raw_ranks_series = extracted_ranks_text["ranks_text"].fillna("")
 
         clean_df["ranks"] = raw_ranks_series.apply(lambda x: parse_ranks_semantic(x, ranks_parse_type))
+        logger.debug(f"[{prefecture}] Rank semantic parsing completed using regex pattern matching")
 
-    # TODO: 後續補上審查類型, 受審者類型和審查方式
+    # 預留欄位賦值
     clean_df["type"] = 1
     clean_df["candidate_type"] = 1
     clean_df["delivery_method_type"] = 1
@@ -226,7 +246,7 @@ def transform_raw_data(prefecture):
     valid_note_cols = [col for col in note_columns_map.keys() if col in raw_df.columns]
 
     if not valid_note_cols:
-        print("⚠️ 提示: YAML 中未設定額外備註欄位，維持原始 note 資料。")
+        logger.debug(f"[{prefecture}] Custom metadata note skipped: No mapped notes columns found in config")
     else:
         for col in valid_note_cols:
             # 建立 "標籤: 數值" 陣列
@@ -243,6 +263,8 @@ def transform_raw_data(prefecture):
                 clean_df["note"] + formatted_cell
             )
 
+        logger.debug(f"[{prefecture}] Dynamic note field concatenation completed for columns: {valid_note_cols}")
+
     # =====================================================================
     # Final Phase: 輸出 shinsa 資料成 csv
     # =====================================================================
@@ -257,23 +279,17 @@ def transform_raw_data(prefecture):
     file_name = f"{current_year}_{prefecture}_shinsas.csv"
     output_csv_path = output_dir / file_name
     output_csv_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.debug(f"[{prefecture}] Writing transformed dataset to disk: '{output_csv_path}'")
     clean_df.to_csv(output_csv_path, index=False, encoding="utf-8-sig")
 
-    print("\n--------------------------------------------------")
-    print(f"Transform 階段成功：檔案更名與數據清洗完畢。")
-    print(f"成功過濾無效表頭與雜訊資料，共計產出 {len(clean_df)} 筆標準審查數據。")
-    print(f"清洗後的資料已寫入目標路徑：{output_csv_path.resolve()}")
-    print("--------------------------------------------------")
+    logger.info(f"[{prefecture}] Transformation pipeline finished | Generated {len(clean_df)} standardized records | Output file: '{output_csv_path.resolve()}'")
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("\n❌ 啟動失敗：執行時必須在後方指定縣市代號！")
-        print("💡 正確執行範例： python raw_data_transformer.py chiba")
-        sys.exit(1)
+    # 局部除錯
+    config_helper.setup_global_logger(log_dir="logs", screen_level="DEBUG")
+    debug_target = "chiba"
+    logger.info(f"Local debug mode | Executing pdf_extractor.py independently for: {debug_target}")
 
-    target_prefecture = config_helper.validate_and_format_prefecture(sys.argv[1])
-
-    print(f"\n🎯 [工作流啟動] 已成功鎖定標準目標縣市: {target_prefecture}")
-
-    transform_raw_data(prefecture=target_prefecture)
+    transform_raw_data(prefecture=debug_target)
