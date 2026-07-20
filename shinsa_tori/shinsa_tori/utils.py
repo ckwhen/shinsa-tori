@@ -35,6 +35,9 @@ def get_era_year_by_text(text: str) -> int | None:
   raw_year = match.group(1)
   return int(convert_full_to_half(raw_year))
 
+def convert_ce_to_reiwa_year(ce_year: int) -> int:
+    return ce_year - 2019 + 1
+
 def convert_reiwa_to_ce_year(reiwa_year: int) -> int:
     return reiwa_year + 2018
 
