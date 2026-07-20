@@ -107,8 +107,9 @@ def transform_raw_data(prefecture):
     logger.info(f"[{prefecture}] DataFrame merged successfully | Total raw rows: {len(raw_df)} | Primary baseline file: '{csv_path.name}'")
 
     # =====================================================================
-    # Preparation: 讀取 YAML 中的核心設定
+    # Preparation
     # =====================================================================
+    # 讀取 YAML 中的核心設定
     federation_name = pref_config.get("federation_name")
     allow_keywords = transform_settings.get("allow_keywords", [])
     ignore_keywords = transform_settings.get("ignore_keywords", [])
@@ -123,52 +124,13 @@ def transform_raw_data(prefecture):
 
     current_year = csv_path.name.split("_")[0]
 
+    # 將 RAW CSV 轉成 DataFrame
     logger.debug(f"[{prefecture}] Loading csv string profile from: '{csv_path.name}'")
     raw_df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
     if raw_df.empty:
         logger.error(f"[{prefecture}] Data validation error: Source DataFrame is completely empty from '{csv_path.name}'")
         raise ValueError(f"Source raw data file is empty: {csv_path.name}")
 
-    # =====================================================================
-    # Phase 1: 清除可能的無效資料
-    # =====================================================================
-    initial_row_count = len(raw_df)
-    logger.debug(f"[{prefecture}] Initiating Phase 1 row filtration | Initial rows: {initial_row_count}")
-
-    # 取得每列平均有效資料格數，用以清除無效行
-    valid_cells_per_row = ((raw_df != "") & raw_df.notna()).sum(axis=1)
-    mean_valid_cells = valid_cells_per_row.mean()
-    dynamic_threshold = mean_valid_cells - EMPTY_CELLS_TOLERANCE
-
-    # 執行密度過濾
-    raw_df = raw_df[valid_cells_per_row >= dynamic_threshold]
-    after_density_count = len(raw_df)
-
-    # 依據 allow_keywords 保留所有包含 keyword 的列
-    allow_pattern = '|'.join(allow_keywords)
-    is_any_allow = raw_df.apply(
-        lambda col: col.astype(str).str.contains(allow_pattern, case=False, na=False)
-    ).any(axis=1)
-    raw_df = raw_df[is_any_allow]
-
-    # 依據 ignore_keywords 移除所有包含 keyword 的列
-    deny_pattern = '|'.join(ignore_keywords)
-    is_any_deny = raw_df.apply(
-        lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
-    ).any(axis=1)
-    raw_df = raw_df[~is_any_deny]
-
-    logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
-
-    final_phase_count = len(raw_df)
-    logger.info(f"[{prefecture}] Phase 1 filtration completed | Removed {initial_row_count - final_phase_count} noise rows | Remaining rows: {final_phase_count}")
-    if raw_df.empty:
-        logger.error(f"[{prefecture}] Integrity failure: Zero records remained after Phase 1 keyword filtering")
-        raise ValueError(f"Data survival check failed: All rows filtered out as noise for prefecture {prefecture}")
-
-    # =====================================================================
-    # Phase 2: 開始清洗 shinsa 所需資料
-    # =====================================================================
     clean_df = raw_df.copy()
 
     # 依據 ffill_columns 填補指定欄位中的 rowspan
@@ -203,6 +165,46 @@ def transform_raw_data(prefecture):
     # 依據 shinsa_columns_map 對 rename 進行向量化更名映射
     clean_df = clean_df.rename(columns=shinsa_columns_map, errors="ignore")
 
+    # =====================================================================
+    # Phase 1: 清除可能的無效資料
+    # =====================================================================
+    initial_row_count = len(raw_df)
+    logger.debug(f"[{prefecture}] Initiating Phase 1 row filtration | Initial rows: {initial_row_count}")
+
+    # 取得每列平均有效資料格數，用以清除無效行
+    valid_cells_per_row = ((clean_df != "") & clean_df.notna()).sum(axis=1)
+    mean_valid_cells = valid_cells_per_row.mean()
+    dynamic_threshold = mean_valid_cells - EMPTY_CELLS_TOLERANCE
+
+    # 執行密度過濾
+    clean_df = clean_df[valid_cells_per_row >= dynamic_threshold]
+    after_density_count = len(clean_df)
+
+    # 依據 allow_keywords 保留所有包含 keyword 的列
+    allow_pattern = '|'.join(allow_keywords)
+    is_any_allow = clean_df.apply(
+        lambda col: col.astype(str).str.contains(allow_pattern, case=False, na=False)
+    ).any(axis=1)
+    clean_df = clean_df[is_any_allow]
+
+    # 依據 ignore_keywords 移除所有包含 keyword 的列
+    deny_pattern = '|'.join(ignore_keywords)
+    is_any_deny = clean_df.apply(
+        lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
+    ).any(axis=1)
+    clean_df = clean_df[~is_any_deny]
+
+    logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
+
+    final_phase_count = len(clean_df)
+    logger.info(f"[{prefecture}] Phase 1 filtration completed | Removed {initial_row_count - final_phase_count} noise rows | Remaining rows: {final_phase_count}")
+    if clean_df.empty:
+        logger.error(f"[{prefecture}] Integrity failure: Zero records remained after Phase 1 keyword filtering")
+        raise ValueError(f"Data survival check failed: All rows filtered out as noise for prefecture {prefecture}")
+
+    # =====================================================================
+    # Phase 2: 開始清洗 shinsa 所需資料
+    # =====================================================================
     # 處理月、日拆分
     if date_extract_type == "combined_text":
         regex = DATE_EXTRACT_REGEX_MAP.get("combined_text")
