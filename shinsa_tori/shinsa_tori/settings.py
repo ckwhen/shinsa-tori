@@ -64,12 +64,12 @@ DOWNLOAD_DELAY = 2
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 ITEM_PIPELINES = {
     "shinsa_tori.pipelines.ShinsaToriFilesPipeline": 1,
-   "shinsa_tori.pipelines.ShinsaToriPipeline": 800,
-   "shinsa_tori.pipelines.FederationPipeline": 850,
-   "shinsa_tori.pipelines.KyudojoPipeline": 900,
+    "shinsa_tori.pipelines.ShinsaToriPipeline": 800,
+    "shinsa_tori.pipelines.FederationPipeline": 850,
+    "shinsa_tori.pipelines.KyudojoPipeline": 900,
 }
 
-FILES_STORE = 'downloads'
+FILES_STORE = "downloads"
 
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See https://docs.scrapy.org/en/latest/topics/autothrottle.html

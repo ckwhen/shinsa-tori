@@ -1,5 +1,6 @@
 import hashlib
 
+from loguru import logger
 from scrapy.pipelines.files import FilesPipeline
 from scrapy.exceptions import DropItem
 from scrapy.http import Request
