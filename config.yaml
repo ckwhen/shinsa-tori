@@ -12,9 +12,8 @@ chiba:
   federation_name: "千葉県弓道連盟"
   extract:
     start_urls:
-      - "https://chiba-kyudo.jp"  # 範例：千葉縣弓道連盟審查公告網頁
-    pdf_link_css: "div.news-list a[href$='.pdf']::attr(href)"  # 只抓取 .pdf 結尾的連結
-    excel_compatible: true  # 輸出 utf-8-sig，確保 Excel 開啟中文不亂碼
+      - "https://chiba-kyudo.jp"
+    pdf_link_css: "div.news-list a[href$='.pdf']::attr(href)"
     download_folder: *base_input
     download_delay: 2.0
 
