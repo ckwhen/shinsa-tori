@@ -56,7 +56,7 @@ def extract_pdf_tables(prefecture):
         logger.error(f"[{prefecture}] Directory error: Target source folder '{pdf_dir}' does not exist")
         raise FileNotFoundError(f"Source PDF directory missing: {pdf_dir}")
 
-    pdf_files = list(pdf_dir.glob("*.pdf"))
+    pdf_files = list(pdf_dir.glob(f"*_{prefecture}_*.pdf"))
 
     logger.info(f"[{prefecture}] Scan completed | Found {len(pdf_files)} PDF files to process")
 
