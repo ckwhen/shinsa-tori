@@ -110,6 +110,7 @@ def transform_raw_data(prefecture):
     # Preparation: 讀取 YAML 中的核心設定
     # =====================================================================
     federation_name = pref_config.get("federation_name")
+    allow_keywords = transform_settings.get("allow_keywords", [])
     ignore_keywords = transform_settings.get("ignore_keywords", [])
     ffill_cols = transform_settings.get("ffill_columns", [])
     shinsa_columns_map = transform_settings.get("shinsa_columns_map", {})
@@ -143,9 +144,20 @@ def transform_raw_data(prefecture):
     raw_df = raw_df[valid_cells_per_row >= dynamic_threshold]
     after_density_count = len(raw_df)
 
+    # 依據 allow_keywords 保留所有包含 keyword 的列
+    allow_pattern = '|'.join(allow_keywords)
+    is_any_allow = raw_df.apply(
+        lambda col: col.astype(str).str.contains(allow_pattern, case=False, na=False)
+    ).any(axis=1)
+    raw_df = raw_df[is_any_allow]
+
     # 依據 ignore_keywords 移除所有包含 keyword 的列
-    is_any_keyword = raw_df.isin(ignore_keywords).any(axis=1)
-    raw_df = raw_df[~is_any_keyword]
+    deny_pattern = '|'.join(ignore_keywords)
+    is_any_deny = raw_df.apply(
+        lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
+    ).any(axis=1)
+    raw_df = raw_df[~is_any_deny]
+
     logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
 
     final_phase_count = len(raw_df)
