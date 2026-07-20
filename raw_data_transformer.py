@@ -1,4 +1,3 @@
-import sys
 import re
 import numpy as np
 import pandas as pd
@@ -11,6 +10,8 @@ EMPTY_CELLS_TOLERANCE = 3
 DATE_EXTRACT_REGEX_MAP = {
     # 情況 A: 4月19日 (日)
     "combined_text": r"(?P<month>\d+)\s*月\s*(?P<day>\d+)\s*日.*",
+    # 情況 B: | 4月 | 19日 |
+    "split_columns": r"\s*(?P<digit>\d{1,2})\s*",
 }
 RANK_NAMES = ["無指定", "初段", "弐段", "参段", "四段", "五段"]
 RANK_ABBREVIATION_MAP = {
@@ -211,6 +212,59 @@ def transform_raw_data(prefecture):
         extracted = clean_df["start_at"].astype(str).str.extract(regex)
         clean_df["month"] = extracted["month"]
         clean_df["day"] = extracted["day"]
+
+    elif date_extract_type == "split_columns":
+        logger.debug(f"[{prefecture}] Multi-column date extraction triggered [split_columns mode]")
+
+        # 檢查 config.yaml 是否設定了 shinsa_columns_map
+        if not shinsa_columns_map or not isinstance(shinsa_columns_map, dict):
+            critical_err = (
+                f"[{prefecture}] Configuration Hazard: 'date_extract_type' is set to 'split_columns', "
+                f"but 'shinsa_columns_map' is missing or malformed in config.yaml!"
+            )
+            logger.error(critical_err)
+            raise ValueError(critical_err)
+
+        # 反查月份與日期的實體欄位
+        # 查找 shinsa_columns_map，將 "month" 與 "day" 的擁有者找出來
+        month_source_col = None
+        day_source_col = None
+        for physical_col, semantic_name in shinsa_columns_map.items():
+            if semantic_name == "month":
+                month_source_col = physical_col
+            elif semantic_name == "day":
+                day_source_col = physical_col
+
+        if not month_source_col or not day_source_col:
+            critical_err = (
+                f"[{prefecture}] Matrix Alignment Failure: Could not resolve physical mapping "
+                f"for semantic 'month' or 'day' tokens from shinsa_columns_map: {shinsa_columns_map}"
+            )
+            logger.error(critical_err)
+            raise KeyError(critical_err)
+
+        # 檢查這些實體欄位是否存在於目前讀取的 clean_df 當中
+        month_source_col = shinsa_columns_map[month_source_col]
+        day_source_col = shinsa_columns_map[day_source_col]
+        if month_source_col not in clean_df.columns or day_source_col not in clean_df.columns:
+            critical_err = (
+                f"[{prefecture}] Data Integrity Fault: Resolved columns ['{month_source_col}', '{day_source_col}'] "
+                f"do not exist within extracted PDF dataframe grid system! Existing columns: {list(clean_df.columns)}"
+            )
+            logger.error(critical_err)
+            raise LookupError(critical_err)
+
+        logger.info(
+            f"[{prefecture}] Dynamic Routing Synced | "
+            f"Month channel mapped to '{month_source_col}' | Day channel mapped to '{day_source_col}'"
+        )
+
+        digit_regex = DATE_EXTRACT_REGEX_MAP.get("split_columns")
+        extracted_month = clean_df[month_source_col].astype(str).str.extract(digit_regex)
+        extracted_day = clean_df[day_source_col].astype(str).str.extract(digit_regex)
+
+        clean_df["month"] = extracted_month["digit"]
+        clean_df["day"] = extracted_day["digit"]
 
     # 依據日本財政年度規則調整審查年份
     fiscal_start_at = pd.to_datetime(
