@@ -43,3 +43,28 @@ chiba:
       col_4: "支部締切"
       col_5: "審査部締切"
       col_7: "雨待機場所"
+
+fukuoka:
+  federation_name: "福岡県弓道連盟"
+  extract:
+    download_folder: *base_input
+
+  transform:
+    input_folder: *base_input
+    output_folder: *base_output
+    date_extract_type: "split_columns"
+    allow_keywords:
+      - "地方審査"
+    ignore_keywords:
+      - "地方審査練習"
+    ffill_columns:
+      - "col_0"
+    shinsa_columns_map:
+      col_0: "month"
+      col_1: "day"
+      col_3: "name"
+      col_4: "location"
+    ranks_setup:
+      source_column: "name"
+      parse_type: "range"
+      text_regex: '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
