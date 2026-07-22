@@ -34,7 +34,7 @@ def parse_ranks_semantic(input: str, parse_type: str) -> str:
     clean_input = str(input).strip()
     result_set = set()
 
-    # 💡 型態 1：一個蘿蔔一個坑 (無指定・初段・参段)
+    # 無指定・初段・参段
     if parse_type == "peer_to_peer":
         tokens = re.split(r"[・,、/]", clean_input)
         for t in tokens:
@@ -46,13 +46,33 @@ def parse_ranks_semantic(input: str, parse_type: str) -> str:
             if norm_t in RANK_NAMES:
                 result_set.add(norm_t)
 
+    # 無指定～四段
+    elif parse_type == "range":
+        range_symbol = '~'
+        match_range = re.sub(r'[~～〜\-]', range_symbol, clean_input)
+        if range_symbol in match_range:
+            start_part, end_part = match_range.split(range_symbol, 1)
+
+            is_eligible = False
+            for rank in RANK_NAMES:
+                if start_part in rank or rank in start_part:
+                    is_eligible = True
+
+                # 開關打開了，才允許把段位加進去
+                if is_eligible:
+                    result_set.add(rank)
+
+                # 終點檢查
+                if rank in end_part:
+                    break
+
     if not result_set:
         logger.debug(f"Rank semantic parsing returned empty result | Input: '{clean_input}' | Type: '{parse_type}'")
         return ""
         
     sorted_output = [r for r in RANK_NAMES if r in result_set]
     parsed_ranks_str = " | ".join(sorted_output)
-    logger.trace(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
+    logger.info(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
 
     return parsed_ranks_str
 
