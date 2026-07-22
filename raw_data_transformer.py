@@ -1,4 +1,3 @@
-import sys
 import re
 import numpy as np
 import pandas as pd
@@ -11,6 +10,8 @@ EMPTY_CELLS_TOLERANCE = 3
 DATE_EXTRACT_REGEX_MAP = {
     # 情況 A: 4月19日 (日)
     "combined_text": r"(?P<month>\d+)\s*月\s*(?P<day>\d+)\s*日.*",
+    # 情況 B: | 4月 | 19日 |
+    "split_columns": r"\s*(?P<digit>\d{1,2})\s*",
 }
 RANK_NAMES = ["無指定", "初段", "弐段", "参段", "四段", "五段"]
 RANK_ABBREVIATION_MAP = {
@@ -33,7 +34,7 @@ def parse_ranks_semantic(input: str, parse_type: str) -> str:
     clean_input = str(input).strip()
     result_set = set()
 
-    # 💡 型態 1：一個蘿蔔一個坑 (無指定・初段・参段)
+    # 無指定・初段・参段
     if parse_type == "peer_to_peer":
         tokens = re.split(r"[・,、/]", clean_input)
         for t in tokens:
@@ -45,13 +46,33 @@ def parse_ranks_semantic(input: str, parse_type: str) -> str:
             if norm_t in RANK_NAMES:
                 result_set.add(norm_t)
 
+    # 無指定～四段
+    elif parse_type == "range":
+        range_symbol = '~'
+        match_range = re.sub(r'[~～〜\-]', range_symbol, clean_input)
+        if range_symbol in match_range:
+            start_part, end_part = match_range.split(range_symbol, 1)
+
+            is_eligible = False
+            for rank in RANK_NAMES:
+                if start_part in rank or rank in start_part:
+                    is_eligible = True
+
+                # 開關打開了，才允許把段位加進去
+                if is_eligible:
+                    result_set.add(rank)
+
+                # 終點檢查
+                if rank in end_part:
+                    break
+
     if not result_set:
         logger.debug(f"Rank semantic parsing returned empty result | Input: '{clean_input}' | Type: '{parse_type}'")
         return ""
         
     sorted_output = [r for r in RANK_NAMES if r in result_set]
     parsed_ranks_str = " | ".join(sorted_output)
-    logger.trace(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
+    logger.info(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
 
     return parsed_ranks_str
 
@@ -107,9 +128,11 @@ def transform_raw_data(prefecture):
     logger.info(f"[{prefecture}] DataFrame merged successfully | Total raw rows: {len(raw_df)} | Primary baseline file: '{csv_path.name}'")
 
     # =====================================================================
-    # Preparation: 讀取 YAML 中的核心設定
+    # Preparation
     # =====================================================================
+    # 讀取 YAML 中的核心設定
     federation_name = pref_config.get("federation_name")
+    allow_keywords = transform_settings.get("allow_keywords", [])
     ignore_keywords = transform_settings.get("ignore_keywords", [])
     ffill_cols = transform_settings.get("ffill_columns", [])
     shinsa_columns_map = transform_settings.get("shinsa_columns_map", {})
@@ -122,41 +145,13 @@ def transform_raw_data(prefecture):
 
     current_year = csv_path.name.split("_")[0]
 
+    # 將 RAW CSV 轉成 DataFrame
     logger.debug(f"[{prefecture}] Loading csv string profile from: '{csv_path.name}'")
     raw_df = pd.read_csv(csv_path, dtype=str, keep_default_na=False)
     if raw_df.empty:
         logger.error(f"[{prefecture}] Data validation error: Source DataFrame is completely empty from '{csv_path.name}'")
         raise ValueError(f"Source raw data file is empty: {csv_path.name}")
 
-    # =====================================================================
-    # Phase 1: 清除可能的無效資料
-    # =====================================================================
-    initial_row_count = len(raw_df)
-    logger.debug(f"[{prefecture}] Initiating Phase 1 row filtration | Initial rows: {initial_row_count}")
-
-    # 取得每列平均有效資料格數，用以清除無效行
-    valid_cells_per_row = ((raw_df != "") & raw_df.notna()).sum(axis=1)
-    mean_valid_cells = valid_cells_per_row.mean()
-    dynamic_threshold = mean_valid_cells - EMPTY_CELLS_TOLERANCE
-
-    # 執行密度過濾
-    raw_df = raw_df[valid_cells_per_row >= dynamic_threshold]
-    after_density_count = len(raw_df)
-
-    # 依據 ignore_keywords 移除所有包含 keyword 的列
-    is_any_keyword = raw_df.isin(ignore_keywords).any(axis=1)
-    raw_df = raw_df[~is_any_keyword]
-    logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
-
-    final_phase_count = len(raw_df)
-    logger.info(f"[{prefecture}] Phase 1 filtration completed | Removed {initial_row_count - final_phase_count} noise rows | Remaining rows: {final_phase_count}")
-    if raw_df.empty:
-        logger.error(f"[{prefecture}] Integrity failure: Zero records remained after Phase 1 keyword filtering")
-        raise ValueError(f"Data survival check failed: All rows filtered out as noise for prefecture {prefecture}")
-
-    # =====================================================================
-    # Phase 2: 開始清洗 shinsa 所需資料
-    # =====================================================================
     clean_df = raw_df.copy()
 
     # 依據 ffill_columns 填補指定欄位中的 rowspan
@@ -191,12 +186,105 @@ def transform_raw_data(prefecture):
     # 依據 shinsa_columns_map 對 rename 進行向量化更名映射
     clean_df = clean_df.rename(columns=shinsa_columns_map, errors="ignore")
 
+    # =====================================================================
+    # Phase 1: 清除可能的無效資料
+    # =====================================================================
+    initial_row_count = len(raw_df)
+    logger.debug(f"[{prefecture}] Initiating Phase 1 row filtration | Initial rows: {initial_row_count}")
+
+    # 取得每列平均有效資料格數，用以清除無效行
+    valid_cells_per_row = ((clean_df != "") & clean_df.notna()).sum(axis=1)
+    mean_valid_cells = valid_cells_per_row.mean()
+    dynamic_threshold = mean_valid_cells - EMPTY_CELLS_TOLERANCE
+
+    # 執行密度過濾
+    clean_df = clean_df[valid_cells_per_row >= dynamic_threshold]
+    after_density_count = len(clean_df)
+
+    # 依據 allow_keywords 保留所有包含 keyword 的列
+    allow_pattern = '|'.join(allow_keywords)
+    is_any_allow = clean_df.apply(
+        lambda col: col.astype(str).str.contains(allow_pattern, case=False, na=False)
+    ).any(axis=1)
+    clean_df = clean_df[is_any_allow]
+
+    # 依據 ignore_keywords 移除所有包含 keyword 的列
+    deny_pattern = '|'.join(ignore_keywords)
+    is_any_deny = clean_df.apply(
+        lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
+    ).any(axis=1)
+    clean_df = clean_df[~is_any_deny]
+
+    logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
+
+    final_phase_count = len(clean_df)
+    logger.info(f"[{prefecture}] Phase 1 filtration completed | Removed {initial_row_count - final_phase_count} noise rows | Remaining rows: {final_phase_count}")
+    if clean_df.empty:
+        logger.error(f"[{prefecture}] Integrity failure: Zero records remained after Phase 1 keyword filtering")
+        raise ValueError(f"Data survival check failed: All rows filtered out as noise for prefecture {prefecture}")
+
+    # =====================================================================
+    # Phase 2: 開始清洗 shinsa 所需資料
+    # =====================================================================
     # 處理月、日拆分
     if date_extract_type == "combined_text":
         regex = DATE_EXTRACT_REGEX_MAP.get("combined_text")
         extracted = clean_df["start_at"].astype(str).str.extract(regex)
         clean_df["month"] = extracted["month"]
         clean_df["day"] = extracted["day"]
+
+    elif date_extract_type == "split_columns":
+        logger.debug(f"[{prefecture}] Multi-column date extraction triggered [split_columns mode]")
+
+        # 檢查 config.yaml 是否設定了 shinsa_columns_map
+        if not shinsa_columns_map or not isinstance(shinsa_columns_map, dict):
+            critical_err = (
+                f"[{prefecture}] Configuration Hazard: 'date_extract_type' is set to 'split_columns', "
+                f"but 'shinsa_columns_map' is missing or malformed in config.yaml!"
+            )
+            logger.error(critical_err)
+            raise ValueError(critical_err)
+
+        # 反查月份與日期的實體欄位
+        # 查找 shinsa_columns_map，將 "month" 與 "day" 的擁有者找出來
+        month_source_col = None
+        day_source_col = None
+        for physical_col, semantic_name in shinsa_columns_map.items():
+            if semantic_name == "month":
+                month_source_col = physical_col
+            elif semantic_name == "day":
+                day_source_col = physical_col
+
+        if not month_source_col or not day_source_col:
+            critical_err = (
+                f"[{prefecture}] Matrix Alignment Failure: Could not resolve physical mapping "
+                f"for semantic 'month' or 'day' tokens from shinsa_columns_map: {shinsa_columns_map}"
+            )
+            logger.error(critical_err)
+            raise KeyError(critical_err)
+
+        # 檢查這些實體欄位是否存在於目前讀取的 clean_df 當中
+        month_source_col = shinsa_columns_map[month_source_col]
+        day_source_col = shinsa_columns_map[day_source_col]
+        if month_source_col not in clean_df.columns or day_source_col not in clean_df.columns:
+            critical_err = (
+                f"[{prefecture}] Data Integrity Fault: Resolved columns ['{month_source_col}', '{day_source_col}'] "
+                f"do not exist within extracted PDF dataframe grid system! Existing columns: {list(clean_df.columns)}"
+            )
+            logger.error(critical_err)
+            raise LookupError(critical_err)
+
+        logger.info(
+            f"[{prefecture}] Dynamic Routing Synced | "
+            f"Month channel mapped to '{month_source_col}' | Day channel mapped to '{day_source_col}'"
+        )
+
+        digit_regex = DATE_EXTRACT_REGEX_MAP.get("split_columns")
+        extracted_month = clean_df[month_source_col].astype(str).str.extract(digit_regex)
+        extracted_day = clean_df[day_source_col].astype(str).str.extract(digit_regex)
+
+        clean_df["month"] = extracted_month["digit"]
+        clean_df["day"] = extracted_day["digit"]
 
     # 依據日本財政年度規則調整審查年份
     fiscal_start_at = pd.to_datetime(

@@ -44,11 +44,6 @@ def extract_pdf_tables(prefecture):
     # 定義輸入與輸出路徑
     input_dir = Path(extract_settings.get("download_folder", "./shinsa_tori/downloads"))
     pdf_dir = input_dir / "full"
-    
-    # 讀取編碼設定
-    encoding_choice = (
-        "utf-8-sig" if extract_settings.get("excel_compatible", True) else "utf-8"
-    )
 
     logger.debug(f"[{prefecture}] Scanning input file directory: '{pdf_dir}'")
 
@@ -56,7 +51,7 @@ def extract_pdf_tables(prefecture):
         logger.error(f"[{prefecture}] Directory error: Target source folder '{pdf_dir}' does not exist")
         raise FileNotFoundError(f"Source PDF directory missing: {pdf_dir}")
 
-    pdf_files = list(pdf_dir.glob("*.pdf"))
+    pdf_files = list(pdf_dir.glob(f"*_{prefecture}_*.pdf"))
 
     logger.info(f"[{prefecture}] Scan completed | Found {len(pdf_files)} PDF files to process")
 
@@ -130,7 +125,7 @@ def extract_pdf_tables(prefecture):
 
         logger.debug(f"[{prefecture}] Writing records to disk: '{raw_table_path}'")
 
-        with open(raw_table_path, mode="w", encoding=encoding_choice, newline="") as f:
+        with open(raw_table_path, mode="w", encoding="utf-8-sig", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(csv_headers)
             writer.writerows(raw_pdf_items)

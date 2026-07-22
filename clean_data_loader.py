@@ -103,7 +103,7 @@ def load_all_clean_data():
                 # 準備與加工暫存數據
                 prepare_data_sql = r"""
                     -- A. 建立結構完全扁平的暫時加工表
-                    CREATE TEMP TABLE temp_shinsa_prepared (
+                    CREATE TEMP TABLE IF NOT EXISTS temp_shinsa_prepared (
                         name VARCHAR(255),
                         type INT,
                         location VARCHAR(255),
@@ -164,7 +164,7 @@ def load_all_clean_data():
 
                 # 建立用於接收主表 UPSERT 結果的實體 ID 暫存表
                 cur.execute(r"""
-                    CREATE TEMP TABLE temp_upserted_results (
+                    CREATE TEMP TABLE IF NOT EXISTS temp_upserted_results (
                         id UUID, name VARCHAR(255), location VARCHAR(255), start_at TIMESTAMP
                     ) ON COMMIT DROP;
                 """)
@@ -195,7 +195,7 @@ def load_all_clean_data():
 
                 # 建立用於清洗 shinsas, ranks 多對多關係的外鍵安全對齊暫存表
                 cur.execute(r"""
-                    CREATE TEMP TABLE temp_ranks_to_insert (
+                    CREATE TEMP TABLE IF NOT EXISTS temp_ranks_to_insert (
                         shinsa_id UUID, rank_id UUID
                     ) ON COMMIT DROP;
                 """)
