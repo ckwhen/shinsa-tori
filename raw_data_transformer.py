@@ -338,7 +338,29 @@ def transform_raw_data(prefecture):
         "delivery_method_type", "note", "federation_name", "ranks",
         "file_name", "url_hash"
     ]
-    clean_df = clean_df.reindex(columns=final_headers)
+
+    if clean_df.columns.duplicated().any():
+        duplicated_columns_list = clean_df.columns[clean_df.columns.duplicated()].unique().tolist()
+        logger.warning(f"Memory alignment conflict! Duplicate column elements tracked: {duplicated_columns_list}")
+
+        # 保留第一個欄位，丟棄後續的同名欄位
+        clean_df = clean_df.loc[:, ~clean_df.columns.duplicated()]
+        logger.info("Successfully pruned duplicated memory columns by keeping the first occurrence.")
+    else:
+        logger.info("DataFrame schema structural verification passed. No duplicate columns found.")
+
+    clean_df = clean_df.reset_index(drop=True)
+
+    missing_headers = [col for col in final_headers if col not in clean_df.columns]
+    if missing_headers:
+        logger.warning(f"Expected schema headers missing from source: {missing_headers}. Initializing with NaN.")
+
+    try:
+        clean_df = clean_df.reindex(columns=final_headers)
+        logger.info("DataFrame successfully aligned to final shinsa schema layout.")
+    except Exception as e:
+        logger.exception("Fatal crash on reindex even after explicit metadata deduplication.")
+        raise e
 
     # 組成輸出資料夾和檔名
     file_name = f"{current_year}_{prefecture}_shinsas.csv"
