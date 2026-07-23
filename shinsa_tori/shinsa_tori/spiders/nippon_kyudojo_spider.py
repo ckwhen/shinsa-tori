@@ -1,8 +1,8 @@
 import scrapy
 import re
 
+from shared.constants import PREFECTURE_MAP
 from shinsa_tori.items import KyudojoItem
-from shinsa_tori.shared.constants import PREFECTURE_MAP
 from shinsa_tori.utils import (
     convert_full_to_half
 )
