@@ -11,11 +11,7 @@ shared_paths:
 chiba:
   federation_name: "千葉県弓道連盟"
   extract:
-    start_urls:
-      - "https://chiba-kyudo.jp"
-    pdf_link_css: "div.news-list a[href$='.pdf']::attr(href)"
     download_folder: *base_input
-    download_delay: 2.0
 
   transform:
     input_folder: *base_input
@@ -31,7 +27,6 @@ chiba:
     ffill_columns:
       - "col_0"
     shinsa_columns_map:
-      col_0: "candidate_type"
       col_1: "start_at"
       col_2: "name"
       col_3: "location"

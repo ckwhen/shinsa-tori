@@ -142,13 +142,15 @@ def transform_raw_data(prefecture):
     clean_df = clean_df.apply(lambda x: x.str.strip() if x.dtype == "object" else x)
 
     # 補足其餘 shinsa 必要標準欄位
-    clean_df["type"] = ""
-    clean_df["delivery_method_type"] = ""
-    clean_df["federation_name"] = federation_name
-    clean_df["year"] = pd.to_numeric(current_year, errors="coerce")
-    clean_df["ranks"] = ""
-    clean_df["file_name"] = raw_df["file_name"]
-    clean_df["url_hash"] = raw_df["url_hash"]
+    clean_df = clean_df.assign(
+        type=1,
+        candidate_type=1,
+        delivery_method_type=1,
+        federation_name=federation_name,
+        year=pd.to_numeric(current_year, errors="coerce"),
+        file_name=raw_df["file_name"],
+        url_hash=raw_df["url_hash"]
+    )
 
     # 依據 shinsa_columns_map 對 rename 進行向量化更名映射
     clean_df = clean_df.rename(columns=shinsa_columns_map, errors="ignore")
@@ -297,11 +299,6 @@ def transform_raw_data(prefecture):
                 .pipe(lambda s: s.apply(ranks_parser))
         )
         logger.debug(f"[{prefecture}] Rank semantic parsing completed using regex pattern matching")
-
-    # 預留欄位賦值
-    clean_df["type"] = 1
-    clean_df["candidate_type"] = 1
-    clean_df["delivery_method_type"] = 1
 
     # 依據 note_columns_map 產生 note 欄位資料
     if "note" not in clean_df.columns:
