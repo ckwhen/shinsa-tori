@@ -209,11 +209,17 @@ def transform_raw_data(prefecture):
     clean_df = clean_df[is_any_allow]
 
     # 依據 ignore_keywords 移除所有包含 keyword 的列
-    deny_pattern = '|'.join(ignore_keywords)
-    is_any_deny = clean_df.apply(
-        lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
-    ).any(axis=1)
-    clean_df = clean_df[~is_any_deny]
+    if not ignore_keywords:
+        logger.info(f"[{prefecture}] Blocklist bypass skipped | Reason: ignore_keywords configuration is empty.")
+    else:
+        deny_pattern = '|'.join(ignore_keywords)
+
+        is_any_deny = clean_df.apply(
+            lambda col: col.astype(str).str.contains(deny_pattern, case=False, na=False)
+        ).any(axis=1)
+
+        logger.debug(f"[{prefecture}] Blocklist match pattern: '{deny_pattern}' | Detected noise rows: {is_any_deny.sum()}")
+        clean_df = clean_df[~is_any_deny]
 
     logger.debug(f"[{prefecture}] Dynamic density threshold filtration applied | Threshold: {dynamic_threshold:.2f} | Remaining rows: {after_density_count}")
 
