@@ -6,7 +6,7 @@ from pdf_extractor import extract_pdf_tables
 from raw_data_transformer import transform_raw_data
 from clean_data_loader import load_all_clean_data
 
-PREFECTURES = ["chiba"]
+PREFECTURES = ["chiba", "fukuoka", "hokkaido"]
 LOG_DIR = "logs"
 
 def run_single_prefecture(target_prefecture: str):
