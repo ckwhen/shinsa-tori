@@ -1,10 +1,19 @@
-import re
 import numpy as np
 import pandas as pd
 import config_helper
 
 from loguru import logger
 from pathlib import Path
+from functools import partial
+from shared.constants import RANK_NAMES
+from shared.ranks_helper import (
+    extract_ranks_by_regexs,
+    parse_peer_to_peer,
+    parse_range,
+    parse_hybrid,
+    format_parsed_ranks
+)
+from shared.string_helper import clean_empty_and_type
 
 EMPTY_CELLS_TOLERANCE = 3
 DATE_EXTRACT_REGEX_MAP = {
@@ -13,66 +22,24 @@ DATE_EXTRACT_REGEX_MAP = {
     # 情況 B: | 4月 | 19日 |
     "split_columns": r"\s*(?P<digit>\d{1,2})\s*",
 }
-RANK_NAMES = ["無指定", "初段", "弐段", "参段", "四段", "五段"]
-RANK_ABBREVIATION_MAP = {
-    "無": "無指定",
-    "初": "初段",
-    "弐": "弐段",
-    "参": "参段",
-    "四": "四段",
-    "五": "五段"
-}
 
-def parse_ranks_semantic(input: str, parse_type: str) -> str:
-    """
-    段位語義解析核心：
-    依據解析規格（如 peer_to_peer）解構原始文字並映射為標準段位標籤。
-    """
-    if not input or pd.isna(input):
-        return ""
-    
-    clean_input = str(input).strip()
-    result_set = set()
+def parse_ranks_semantic(ranks_str: str, parse_type: str) -> str:
+    rank_list = []
 
-    # 無指定・初段・参段
     if parse_type == "peer_to_peer":
-        tokens = re.split(r"[・,、/]", clean_input)
-        for t in tokens:
-            norm_t = RANK_ABBREVIATION_MAP.get(t, t)
-
-            if len(norm_t) == 1 and norm_t != "無":
-                norm_t += "段"
-                
-            if norm_t in RANK_NAMES:
-                result_set.add(norm_t)
-
-    # 無指定～四段
+        rank_list = parse_peer_to_peer(ranks_str)
     elif parse_type == "range":
-        range_symbol = '~'
-        match_range = re.sub(r'[~～〜\-]', range_symbol, clean_input)
-        if range_symbol in match_range:
-            start_part, end_part = match_range.split(range_symbol, 1)
+        rank_list = parse_range(ranks_str)
+    elif parse_type == "hybrid":
+        rank_list = parse_hybrid(ranks_str)
 
-            is_eligible = False
-            for rank in RANK_NAMES:
-                if start_part in rank or rank in start_part:
-                    is_eligible = True
+    parsed_ranks_str = format_parsed_ranks(rank_list, RANK_NAMES)
 
-                # 開關打開了，才允許把段位加進去
-                if is_eligible:
-                    result_set.add(rank)
-
-                # 終點檢查
-                if rank in end_part:
-                    break
-
-    if not result_set:
-        logger.debug(f"Rank semantic parsing returned empty result | Input: '{clean_input}' | Type: '{parse_type}'")
+    if not parsed_ranks_str:
+        logger.debug(f"Rank semantic parsing returned empty result | Input: '{ranks_str}' | Type: '{parse_type}'")
         return ""
-        
-    sorted_output = [r for r in RANK_NAMES if r in result_set]
-    parsed_ranks_str = " | ".join(sorted_output)
-    logger.info(f"Rank parsed | '{clean_input}' -> '{parsed_ranks_str}'")
+
+    logger.info(f"Rank parsed | '{ranks_str}' -> '{parsed_ranks_str}'")
 
     return parsed_ranks_str
 
@@ -141,7 +108,7 @@ def transform_raw_data(prefecture):
     date_extract_type = transform_settings.get("date_extract_type", "")
     rank_source_column = ranks_setup.get("source_column", "")
     ranks_parse_type = str(ranks_setup.get("parse_type", ""))
-    ranks_text_regex = ranks_setup.get("text_regex")
+    ranks_text_regexs = ranks_setup.get("text_regexs")
 
     current_year = csv_path.name.split("_")[0]
 
@@ -321,10 +288,14 @@ def transform_raw_data(prefecture):
     if rank_source_column not in clean_df.columns:
         logger.warning(f"[{prefecture}] Rank extraction bypassed: Source column '{rank_source_column}' not found in DataFrame")
     else:
-        extracted_ranks_text = clean_df[rank_source_column].astype(str).str.extract(ranks_text_regex)
-        raw_ranks_series = extracted_ranks_text["ranks_text"].fillna("")
-
-        clean_df["ranks"] = raw_ranks_series.apply(lambda x: parse_ranks_semantic(x, ranks_parse_type))
+        ranks_str_extractor = partial(extract_ranks_by_regexs, regexs=ranks_text_regexs)
+        ranks_parser = partial(parse_ranks_semantic, parse_type=ranks_parse_type)
+        clean_df["ranks"]  = (
+            clean_df[rank_source_column]
+                .pipe(lambda s: s.apply(clean_empty_and_type))
+                .pipe(lambda s: s.apply(ranks_str_extractor))
+                .pipe(lambda s: s.apply(ranks_parser))
+        )
         logger.debug(f"[{prefecture}] Rank semantic parsing completed using regex pattern matching")
 
     # 預留欄位賦值
