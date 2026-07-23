@@ -38,7 +38,7 @@ chiba:
     ranks_setup:
       source_column: "name"
       parse_type: "peer_to_peer"
-      text_regex: '.*\((?P<ranks_text>[^)]+)\)'
+      text_regexs: '.*\((?P<ranks_text>[^)]+)\)'
     note_columns_map:
       col_4: "支部締切"
       col_5: "審査部締切"
@@ -67,4 +67,32 @@ fukuoka:
     ranks_setup:
       source_column: "name"
       parse_type: "range"
-      text_regex: '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
+      text_regexs: '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
+
+hokkaido:
+  federation_name: "札幌弓道連盟"
+  extract:
+    download_folder: *base_input
+
+  transform:
+    input_folder: *base_input
+    output_folder: *base_output
+    date_extract_type: "combined_text"
+    allow_keywords:
+      - "地方審査"
+    ffill_columns:
+      - "col_1"
+      - "col_3"
+    shinsa_columns_map:
+      col_0: "name"
+      col_1: "start_at"
+      col_3: "location"
+      col_4: "ranks_str"
+    note_columns_map:
+      col_4: "審査種別"
+    ranks_setup:
+      source_column: "ranks_str"
+      parse_type: "hybrid"
+      text_regexs:
+        - '(?<=の)\s*(?P<ranks_text>[^\s]+)'
+        - '^(?P<ranks_text>[^\s]+)(?=\s)'
