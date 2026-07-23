@@ -308,7 +308,7 @@ def transform_raw_data(prefecture):
         clean_df["note"] = ""
 
     clean_df["note"] = clean_df["note"].fillna("").astype(str).str.strip()
-    valid_note_cols = [col for col in note_columns_map.keys() if col in raw_df.columns]
+    valid_note_cols = [col for col in note_columns_map.keys() if col in clean_df.columns]
 
     if not valid_note_cols:
         logger.debug(f"[{prefecture}] Custom metadata note skipped: No mapped notes columns found in config")

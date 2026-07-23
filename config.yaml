@@ -89,7 +89,7 @@ hokkaido:
       col_3: "location"
       col_4: "ranks_str"
     note_columns_map:
-      col_4: "審査種別"
+      ranks_str: "審査種別"
     ranks_setup:
       source_column: "ranks_str"
       parse_type: "hybrid"
