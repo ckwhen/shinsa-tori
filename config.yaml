@@ -38,7 +38,8 @@ chiba:
     ranks_setup:
       source_column: "name"
       parse_type: "peer_to_peer"
-      text_regexs: '.*\((?P<ranks_text>[^)]+)\)'
+      text_regexs:
+        - '.*\((?P<ranks_text>[^)]+)\)'
     note_columns_map:
       col_4: "支部締切"
       col_5: "審査部締切"
@@ -67,7 +68,8 @@ fukuoka:
     ranks_setup:
       source_column: "name"
       parse_type: "range"
-      text_regexs: '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
+      text_regexs:
+        - '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
 
 hokkaido:
   federation_name: "札幌弓道連盟"
