@@ -19,13 +19,13 @@ def load_all_clean_data():
     logger.info("Initiating global clean data loading pipeline")
 
     try:
-        global_config = config_helper.load_config()
+        config = config_helper.load_config()
     except Exception as e:
         logger.exception("Loader initialization failed: Configuration block load error")
         return
 
-    shared_paths = global_config.get("shared_paths", {})
-    input_dir = Path(shared_paths.get("output_folder", ""))
+    global_settings = config.get("global", {})
+    input_dir = Path(global_settings.get("output_folder", ""))
     logger.debug(f"Scanning target clean dataset directory: '{input_dir}'")
     
     if not input_dir.exists():

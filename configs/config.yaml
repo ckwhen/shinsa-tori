@@ -1,7 +1,7 @@
 # =====================================================================
 # 全域共用變數與路徑設定 (未來修改此處，全專案 47 縣市同步更改)
 # =====================================================================
-shared_paths:
+global:
   input_folder: &base_input "./shinsa_tori/downloads"
   output_folder: &base_output "./shinsa_tori/outputs"
 
