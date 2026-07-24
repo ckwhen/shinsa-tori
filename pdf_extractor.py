@@ -1,9 +1,9 @@
 import csv
 import pdfplumber
-import config_helper
 
 from loguru import logger
 from pathlib import Path
+from configs import config_helper
 
 def stream_pdf_rows(pdf):
     """
@@ -33,7 +33,7 @@ def extract_pdf_tables(prefecture):
     # 讀取設定檔與特化區塊
     try:
         pref_config = config_helper.load_config_by_prefecture(
-            config_path="config.yaml",
+            config_path="./configs/config.yaml",
             prefecture=prefecture
         )
         extract_settings = pref_config.get("extract", {})

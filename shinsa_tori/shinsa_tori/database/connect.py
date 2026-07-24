@@ -7,7 +7,7 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 # 移動 database 資料夾時要一併修正
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
-dotenv_path = os.path.join(ROOT_DIR, 'configs', '.env')
+dotenv_path = os.path.join(ROOT_DIR, 'env', '.env')
 
 load_dotenv(dotenv_path)
 

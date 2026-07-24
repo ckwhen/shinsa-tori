@@ -1,13 +1,13 @@
 import os
 import psycopg2
-import config_helper
 
 from loguru import logger
 from pathlib import Path
 from dotenv import load_dotenv
+from configs import config_helper
 
 # 環境變數載入防禦
-ENV_PATH = Path(__file__).resolve().parent / "configs" / ".env"
+ENV_PATH = Path(__file__).resolve().parent / "env" / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 def load_all_clean_data():
@@ -19,7 +19,7 @@ def load_all_clean_data():
     logger.info("Initiating global clean data loading pipeline")
 
     try:
-        global_config = config_helper.load_config(config_path="config.yaml") 
+        global_config = config_helper.load_config(config_path="./configs/config.yaml")
     except Exception as e:
         logger.exception("Loader initialization failed: Configuration block load error")
         return

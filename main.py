@@ -1,7 +1,7 @@
 import sys
 
 from loguru import logger
-from config_helper import validate_and_format_prefecture, setup_global_logger
+from configs.config_helper import validate_and_format_prefecture, setup_global_logger
 from pdf_extractor import extract_pdf_tables
 from raw_data_transformer import transform_raw_data
 from clean_data_loader import load_all_clean_data

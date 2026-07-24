@@ -1,10 +1,10 @@
 import numpy as np
 import pandas as pd
-import config_helper
 
 from loguru import logger
 from pathlib import Path
 from functools import partial
+from configs import config_helper
 from shared.constants import RANK_NAMES
 from shared.ranks_helper import (
     extract_ranks_by_regexs,
@@ -53,7 +53,7 @@ def transform_raw_data(prefecture):
     # 設定檔初始化
     try:
         pref_config = config_helper.load_config_by_prefecture(
-            config_path="config.yaml",
+            config_path="./configs/config.yaml",
             prefecture=prefecture
         )
         transform_settings = pref_config.get("transform", {})
