@@ -52,10 +52,7 @@ def transform_raw_data(prefecture):
 
     # 設定檔初始化
     try:
-        pref_config = config_helper.load_config_by_prefecture(
-            config_path="./configs/config.yaml",
-            prefecture=prefecture
-        )
+        pref_config = config_helper.load_config_by_prefecture(name=prefecture)
         transform_settings = pref_config.get("transform", {})
     except Exception as e:
         logger.exception(f"[{prefecture}] Transformer initialization failed: Configuration block load error")

@@ -32,10 +32,7 @@ def extract_pdf_tables(prefecture):
 
     # 讀取設定檔與特化區塊
     try:
-        pref_config = config_helper.load_config_by_prefecture(
-            config_path="./configs/config.yaml",
-            prefecture=prefecture
-        )
+        pref_config = config_helper.load_config_by_prefecture(name=prefecture)
         extract_settings = pref_config.get("extract", {})
     except Exception as e:
         logger.exception(f"[{prefecture}] Extractor initialization failed: Configuration block load error")

@@ -19,7 +19,7 @@ def load_all_clean_data():
     logger.info("Initiating global clean data loading pipeline")
 
     try:
-        global_config = config_helper.load_config(config_path="./configs/config.yaml")
+        global_config = config_helper.load_config()
     except Exception as e:
         logger.exception("Loader initialization failed: Configuration block load error")
         return
