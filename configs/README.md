@@ -99,5 +99,5 @@ fukuoka:
       source_column: "name"
       parse_type: "range"
       text_regexs:
-        - "[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]"
+        - '[\((]?(?P<ranks_text>[^()（）]*[~～〜\-][^()（）]*)[\))]'
 ```
