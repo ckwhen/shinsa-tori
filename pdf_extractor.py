@@ -1,9 +1,10 @@
 import csv
 import pdfplumber
-import config_helper
 
 from loguru import logger
 from pathlib import Path
+from configs import config_helper
+from shared.log_helper import setup_global_logger
 
 def stream_pdf_rows(pdf):
     """
@@ -32,10 +33,7 @@ def extract_pdf_tables(prefecture):
 
     # 讀取設定檔與特化區塊
     try:
-        pref_config = config_helper.load_config_by_prefecture(
-            config_path="config.yaml",
-            prefecture=prefecture
-        )
+        pref_config = config_helper.load_config_by_prefecture(name=prefecture)
         extract_settings = pref_config.get("extract", {})
     except Exception as e:
         logger.exception(f"[{prefecture}] Extractor initialization failed: Configuration block load error")
@@ -134,7 +132,7 @@ def extract_pdf_tables(prefecture):
 
 if __name__ == "__main__":
     # 局部除錯
-    config_helper.setup_global_logger(log_dir="logs", screen_level="DEBUG")
+    setup_global_logger(log_dir="logs", screen_level="DEBUG")
     debug_target = "chiba"
     logger.info(f"Local debug mode | Executing pdf_extractor.py independently for: {debug_target}")
 

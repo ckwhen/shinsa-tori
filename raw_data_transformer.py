@@ -1,10 +1,11 @@
 import numpy as np
 import pandas as pd
-import config_helper
 
 from loguru import logger
 from pathlib import Path
 from functools import partial
+from configs import config_helper
+from shared.log_helper import setup_global_logger
 from shared.constants import RANK_NAMES
 from shared.ranks_helper import (
     extract_ranks_by_regexs,
@@ -52,10 +53,7 @@ def transform_raw_data(prefecture):
 
     # 設定檔初始化
     try:
-        pref_config = config_helper.load_config_by_prefecture(
-            config_path="config.yaml",
-            prefecture=prefecture
-        )
+        pref_config = config_helper.load_config_by_prefecture(name=prefecture)
         transform_settings = pref_config.get("transform", {})
     except Exception as e:
         logger.exception(f"[{prefecture}] Transformer initialization failed: Configuration block load error")
@@ -372,7 +370,7 @@ def transform_raw_data(prefecture):
 
 if __name__ == "__main__":
     # 局部除錯
-    config_helper.setup_global_logger(log_dir="logs", screen_level="DEBUG")
+    setup_global_logger(log_dir="logs", screen_level="DEBUG")
     debug_target = "chiba"
     logger.info(f"Local debug mode | Executing pdf_extractor.py independently for: {debug_target}")
 
