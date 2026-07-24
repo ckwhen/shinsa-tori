@@ -10,23 +10,18 @@ from clean_data_loader import load_all_clean_data
 PREFECTURES = ["chiba", "fukuoka", "hokkaido"]
 LOG_DIR = "logs"
 
-def run_single_prefecture(target_prefecture: str):
+def process_prefecture(name: str):
     """執行單一縣市的核心流水線"""
-    logger.debug(f"[{target_prefecture}] Initiating pdf extraction")
-    extract_pdf_tables(prefecture=target_prefecture)
+    logger.debug(f"[{name}] Initiating pdf extraction")
+    extract_pdf_tables(prefecture=name)
 
-    logger.debug(f"[{target_prefecture}] Initiating raw data transformation and fuzzy matching")
-    transform_raw_data(prefecture=target_prefecture)
+    logger.debug(f"[{name}] Initiating raw data transformation and fuzzy matching")
+    transform_raw_data(prefecture=name)
 
-    logger.debug(f"[{target_prefecture}] Initiating database loading")
+    logger.debug(f"[{name}] Initiating database loading")
     load_all_clean_data()
 
 def run_pipeline():
-    # 引數檢查
-    if len(sys.argv) < 2:
-        sys.stderr.write("Error: Missing target prefecture. Usage: python main.py <prefecture_name> [--debug] or [--all]\n")
-        sys.exit(1)
-
     # 解析除錯參數 (--debug)
     is_debug = "--debug" in sys.argv
     if is_debug:
@@ -38,8 +33,12 @@ def run_pipeline():
     if is_all_mode:
         sys.argv.remove("--all")
 
-    setup_global_logger(log_dir=LOG_DIR, screen_level=screen_level)
+    # 引數檢查
+    if not is_all_mode and len(sys.argv) < 2:
+        sys.stderr.write("Error: Missing target prefecture. Usage: python main.py <prefecture_name> [--debug] or [--all]\n")
+        sys.exit(1)
 
+    setup_global_logger(log_dir=LOG_DIR, screen_level=screen_level)
     logger.info(f"Pipeline started in {'BATCH' if is_all_mode else 'SINGLE'} mode")
 
     tasks = PREFECTURES if is_all_mode else []
@@ -60,16 +59,16 @@ def run_pipeline():
     for index, pref in enumerate(tasks, 1):
         logger.info(f"Progress: {index}/{len(tasks)} | Processing prefecture: {pref}")
         try:
-            run_single_prefecture(target_prefecture=pref)
+            process_prefecture(name=pref)
             logger.info(f"Progress: {index}/{len(tasks)} | Prefecture {pref} completed successfully")
             success_list.append(pref)
         except Exception as e:
             logger.exception(f"Progress: {index}/{len(tasks)} | Prefecture {pref} failed during execution")
             failed_list.append(pref)
-            
+
             if not is_all_mode:
                 logger.critical("Pipeline execution aborted due to single task failure")
-                sys.exit(1)
+                raise e
             logger.warning(f"Pipeline continues, isolated failure for prefecture: {pref}")
 
     # 最終摘要匯報

@@ -56,7 +56,7 @@ def validate_and_format_prefecture(name: str) -> str:
     """
     if not name or not isinstance(name, str) or name.strip() == "":
         logger.error("Argument validation failed: Input prefecture name is empty or not a string")
-        sys.exit(1)
+        raise ValueError("Prefecture name argument cannot be empty or non-string")
 
     clean_name = name.strip().lower()
 
@@ -64,15 +64,15 @@ def validate_and_format_prefecture(name: str) -> str:
         config = load_config()
 
         if clean_name not in config:
-            logger.error(f"Configuration profile missing: '{clean_name}' block not found in config.yaml")
-            sys.exit(1)
+            logger.error(f"Configuration profile missing: '{clean_name}' block not found in configs/config.yaml")
+            raise KeyError(f"Prefecture profile section '{clean_name}' is undefined in configuration")
             
     except FileNotFoundError:
         logger.critical("Infrastructure error: Critical file 'config.yaml' not found in project root")
-        sys.exit(1)
+        raise e
     except Exception as e:
         logger.exception(f"Configuration read error: Failed to parse config.yaml due to unexpected exception")
-        sys.exit(1)
+        raise e
 
     logger.debug(f"Prefecture parameter sanitized and verified: '{clean_name}'")
     return clean_name
