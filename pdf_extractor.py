@@ -4,6 +4,7 @@ import pdfplumber
 from loguru import logger
 from pathlib import Path
 from configs import config_helper
+from shared.log_helper import setup_global_logger
 
 def stream_pdf_rows(pdf):
     """
@@ -131,7 +132,7 @@ def extract_pdf_tables(prefecture):
 
 if __name__ == "__main__":
     # 局部除錯
-    config_helper.setup_global_logger(log_dir="logs", screen_level="DEBUG")
+    setup_global_logger(log_dir="logs", screen_level="DEBUG")
     debug_target = "chiba"
     logger.info(f"Local debug mode | Executing pdf_extractor.py independently for: {debug_target}")
 
